@@ -7,3 +7,12 @@ export interface HealthResponse {
 
 export type ActorKey = keyof typeof COLORES_ACTOR;
 export type EstadoKey = keyof typeof COLORES_ESTADO;
+
+// Mirror of backend schemas/auth.py UserOut — keep in sync with API contract.
+export interface UserOut {
+  id: number;
+  username: string;
+  nombre_completo: string;
+  rol: "ADMIN" | "EDITOR" | "VIEWER";
+  area: string | null;
+}
