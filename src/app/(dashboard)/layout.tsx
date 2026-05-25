@@ -5,9 +5,10 @@
  * + header with logged-in user info and logout button.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
+import { ReactQueryProvider } from "@/lib/queryClient";
 
 export default function DashboardLayout({
   children,
@@ -17,16 +18,34 @@ export default function DashboardLayout({
   const router = useRouter();
   const { token, user, logout } = useAuthStore();
 
-  // Client-side guard — redundant with middleware, prevents brief flash.
+  // Zustand-persist rehydrates from localStorage on the client. On a hard page
+  // load the first render has token=null until rehydration finishes, so we MUST
+  // wait for hydration before deciding to redirect — otherwise an authenticated
+  // user gets bounced to /login on every full reload.
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    if (!token) {
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  // Client-side guard (defence-in-depth behind the middleware), post-hydration.
+  useEffect(() => {
+    if (hydrated && !token) {
       router.push("/login");
     }
-  }, [token, router]);
+  }, [hydrated, token, router]);
 
   function handleLogout() {
     logout();
     router.push("/login");
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-on-surface text-sm">Cargando…</p>
+      </div>
+    );
   }
 
   if (!token) {
@@ -55,8 +74,10 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="flex-1 p-6">{children}</main>
+      {/* Page content — wrapped in ReactQueryProvider (client subtree safe) */}
+      <main className="flex-1 p-6">
+        <ReactQueryProvider>{children}</ReactQueryProvider>
+      </main>
     </div>
   );
 }

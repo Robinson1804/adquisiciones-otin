@@ -21,5 +21,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  // OJO: los route groups de Next, p.ej. (dashboard), NO aparecen en la URL.
+  // Hay que listar las rutas REALES protegidas. Sumar acá cada sección nueva.
+  matcher: ["/dashboard/:path*", "/procesos/:path*", "/reportes/:path*"],
 };

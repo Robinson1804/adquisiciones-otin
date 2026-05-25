@@ -16,3 +16,64 @@ export interface UserOut {
   rol: "ADMIN" | "EDITOR" | "VIEWER";
   area: string | null;
 }
+
+// ============================================================
+// C2 — Proceso types (mirror backend/app/schemas/proceso.py)
+// ============================================================
+
+export type EstadoProceso = "EN PROCESO" | "CULMINADO" | "CANCELADO";
+export type TipoProceso = "BIEN" | "SERVICIO";
+
+export interface Proceso {
+  id: number;
+  id_proceso: string;
+  requerimiento: string;
+  tipo: TipoProceso | null;
+  unidad_resp: string | null;
+  areas_usuarias: string[] | null;
+  /** Decimal serialized as string by backend — use parseFloat() for display/math. */
+  pim: string | null;
+  estado: EstadoProceso;
+  motivo_cancel: string | null;
+  fecha_creacion: string;
+  creado_por: string | null;
+  anno: number | null;
+}
+
+export interface PaginatedProcesos {
+  items: Proceso[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ProcesoCreatePayload {
+  requerimiento: string;
+  tipo: TipoProceso;
+  unidad_resp?: string | null;
+  areas_usuarias: string[];
+  pim?: number | null;
+  anno: number;
+  cmn_por_area: { area: string; cmn_adjunto: "SI" | "NO" }[];
+}
+
+export interface ProcesoUpdatePayload {
+  requerimiento?: string | null;
+  tipo?: TipoProceso | null;
+  unidad_resp?: string | null;
+  areas_usuarias?: string[] | null;
+  pim?: number | null;
+  estado?: EstadoProceso | null;
+  motivo_cancel?: string | null;
+}
+
+export interface ProcesoFiltros {
+  page?: number;
+  page_size?: number;
+  anno?: number;
+  estado?: EstadoProceso;
+  tipo?: TipoProceso;
+  search?: string;
+  area?: string;
+}
