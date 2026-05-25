@@ -7,6 +7,12 @@ import type {
   ProcesoFiltros,
   ProcesoUpdatePayload,
 } from "@/types";
+import type {
+  EtapasResponse,
+  EtapaOut,
+  EtapaCreatePayload,
+  BuclePayload,
+} from "@/types/etapa";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
@@ -75,4 +81,41 @@ export async function updateProceso(
 
 export async function deleteProceso(id: number): Promise<void> {
   await api.delete(`/procesos/${id}`);
+}
+
+// ============================================================
+// C3a — Etapas API functions
+// ============================================================
+
+export async function getEtapas(procesoId: number): Promise<EtapasResponse> {
+  const res = await api.get<EtapasResponse>(`/procesos/${procesoId}/etapas`);
+  return res.data;
+}
+
+export async function registrarEtapa(
+  procesoId: number,
+  payload: EtapaCreatePayload
+): Promise<EtapaOut> {
+  const res = await api.post<EtapaOut>(`/procesos/${procesoId}/etapas`, payload);
+  return res.data;
+}
+
+export async function actualizarEtapa(
+  etapaId: number,
+  payload: Partial<EtapaCreatePayload>
+): Promise<EtapaOut> {
+  const res = await api.put<EtapaOut>(`/etapas/${etapaId}`, payload);
+  return res.data;
+}
+
+export async function agregarRonda(
+  procesoId: number,
+  cod: string,
+  payload: BuclePayload
+): Promise<EtapaOut> {
+  const res = await api.post<EtapaOut>(
+    `/procesos/${procesoId}/etapas/${cod}/bucle`,
+    payload
+  );
+  return res.data;
 }

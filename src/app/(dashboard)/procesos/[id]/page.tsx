@@ -3,7 +3,7 @@
 /**
  * S4 — Detalle Proceso (/procesos/[id])
  * Left panel: ficha del proceso.
- * Right panel: EtapasPanelPlaceholder (C3 will slot in the real timeline).
+ * Right panel: LineaTiempo (timeline de las 27 etapas).
  */
 
 import React, { useState } from "react";
@@ -11,7 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { useProceso, useActualizarProceso } from "@/hooks/useProcesos";
-import { EtapasPanelPlaceholder } from "@/components/EtapasPanelPlaceholder";
+import { LineaTiempo } from "@/components/procesos/LineaTiempo";
 import { COLORES_ESTADO, COLORES_ACTOR } from "@/lib/constants";
 import type { EstadoProceso } from "@/types";
 
@@ -297,8 +297,11 @@ export default function DetalleProceso() {
           </dl>
         </div>
 
-        {/* Right: Timeline placeholder */}
-        <EtapasPanelPlaceholder />
+        {/* Right: Timeline — C3a */}
+        <LineaTiempo
+          procesoId={proceso.id}
+          areasUsuarias={proceso.areas_usuarias ?? []}
+        />
       </div>
     </div>
   );

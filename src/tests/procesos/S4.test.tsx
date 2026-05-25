@@ -18,6 +18,12 @@ vi.mock("@/hooks/useProcesos", () => ({
   useActualizarProceso: vi.fn(),
 }));
 
+// Mock LineaTiempo so S4 tests stay focused on the ficha panel
+vi.mock("@/components/procesos/LineaTiempo", () => ({
+  LineaTiempo: () =>
+    React.createElement("div", { "data-testid": "linea-tiempo-mock" }, "Linea de Tiempo del Proceso"),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
   useParams: () => ({ id: "1" }),
@@ -115,7 +121,7 @@ describe("S4 — DetalleProceso", () => {
     expect(screen.getByText("GOBERNANZA")).toBeInTheDocument();
   });
 
-  it("renders EtapasPanelPlaceholder (right panel)", () => {
+  it("renders LineaTiempo (right panel — C3a)", () => {
     vi.mocked(useProceso).mockReturnValue({
       data: mockProceso,
       isLoading: false,
@@ -127,10 +133,10 @@ describe("S4 — DetalleProceso", () => {
     render(React.createElement(DetalleProceso), { wrapper: Wrapper });
 
     expect(
-      screen.getByText(/Línea de Tiempo del Proceso/i)
+      screen.getByTestId("linea-tiempo-mock")
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/El seguimiento de etapas estará disponible próximamente/i)
+      screen.getByText(/Linea de Tiempo del Proceso/i)
     ).toBeInTheDocument();
   });
 
