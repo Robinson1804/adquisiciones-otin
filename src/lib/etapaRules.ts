@@ -3,6 +3,7 @@
  *
  * C3a: permissive — returns true (actionable) for all stages.
  * C3b: tightened — encodes R1/R6/R7/E12/E25 prerequisite logic per Design §LAS 8 REGLAS.
+ * C3c: extends PREREQUISITOS to the full main chain (D7). EtapaCard stays unchanged.
  *
  * KEEP THIS AS A PURE FUNCTION over etapas data so UI components stay decoupled.
  * Backend is the source of truth (returns 409); this is defense-in-depth / UX.
@@ -21,16 +22,41 @@ export interface EtapaActionability {
  * Map of prerequisite relationships.
  * Mirrors etapas_catalogo.py prerequisitos from backend (Design D1).
  * C3b: extended with R6/R7 and E08a/E08b.
+ * C3c: extended with the full main chain (D7).
+ *
+ * Main chain: E01→E02→E03→E04→E07→E08→E09→E10→E11→E12→E13→E14→E15
+ *             →E16→E17→E18→E19→E20→E21→E22→E23→E24→E25
+ * Optional loops (NOT in chain): E05/E06←E04, E08a/E08b←E08
  */
 export const PREREQUISITOS: Record<string, string[]> = {
-  E02: ['E01'],       // R1 — all E01 areas must have cmn_adjunto='SI'
+  // Main chain (C3c — each requires the previous chain stage COMPLETADO)
+  E02: ['E01'],       // R1 — also checks all E01 cmn_adjunto='SI'
+  E03: ['E02'],
+  E04: ['E03'],
+  E07: ['E04'],
+  E08: ['E07'],
+  E09: ['E08'],       // R7 — BE also checks resultado_eval=APROBADO
+  E10: ['E09'],
+  E11: ['E10'],
+  E12: ['E11'],       // R3 — all E11 areas must be COMPLETADO
+  E13: ['E12'],
+  E14: ['E13'],
+  E15: ['E14'],
+  E16: ['E15'],
+  E17: ['E16'],
+  E18: ['E17'],
+  E19: ['E18'],
+  E20: ['E19'],
+  E21: ['E20'],
+  E22: ['E21'],
+  E23: ['E22'],
+  E24: ['E23'],
+  E25: ['E24'],       // R5 — all E24 areas must be COMPLETADO
+  // Optional loops (anchor to chain stages; do NOT block main chain)
   E05: ['E04'],       // R6 — E04 must be COMPLETADO
   E06: ['E04'],       // R6
   E08a: ['E08'],
   E08b: ['E08'],
-  E09: ['E08'],       // R7 — E08 must be COMPLETADO (BE also checks resultado_eval=APROBADO)
-  E12: ['E11'],       // R3 — all E11 areas must be COMPLETADO
-  E25: ['E24'],       // R5 — all E24 areas must be COMPLETADO
 };
 
 /**

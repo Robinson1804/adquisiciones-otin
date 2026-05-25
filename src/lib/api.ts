@@ -13,6 +13,7 @@ import type {
   EtapaCreatePayload,
   BuclePayload,
   MontosProceso,
+  ArchivoMeta,
 } from "@/types/etapa";
 
 export const api = axios.create({
@@ -145,4 +146,52 @@ export async function getMontosProceso(
 ): Promise<MontosProceso | null> {
   const res = await api.get<MontosProceso | null>(`/procesos/${procesoId}/montos`);
   return res.data;
+}
+
+// ============================================================
+// C3c — Archivos (file attachments on key stages)
+//
+// IMPORTANT — multipart Content-Type override:
+//   The axios instance sets Content-Type: application/json by default.
+//   When uploading a file we pass FormData; we must explicitly delete
+//   the default Content-Type header from the per-request config so
+//   the browser sets the correct multipart/form-data boundary.
+//   Do NOT hardcode 'multipart/form-data' — the boundary token is
+//   auto-generated and the browser must insert it.
+// ============================================================
+
+export async function getArchivos(etapaId: number): Promise<ArchivoMeta[]> {
+  const res = await api.get<ArchivoMeta[]>(`/etapas/${etapaId}/archivos`);
+  return res.data;
+}
+
+export async function subirArchivo(
+  etapaId: number,
+  file: File
+): Promise<ArchivoMeta> {
+  const formData = new FormData();
+  formData.append("archivo", file);
+  const res = await api.post<ArchivoMeta>(
+    `/etapas/${etapaId}/archivos`,
+    formData,
+    {
+      headers: {
+        // Delete the default 'application/json' so browser sets
+        // 'multipart/form-data; boundary=...' automatically.
+        "Content-Type": undefined,
+      },
+    }
+  );
+  return res.data;
+}
+
+export async function descargarArchivo(archivoId: number): Promise<Blob> {
+  const res = await api.get<Blob>(`/archivos/${archivoId}`, {
+    responseType: "blob",
+  });
+  return res.data;
+}
+
+export async function eliminarArchivo(archivoId: number): Promise<void> {
+  await api.delete(`/archivos/${archivoId}`);
 }

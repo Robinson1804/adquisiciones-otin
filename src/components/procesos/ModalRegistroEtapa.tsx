@@ -12,10 +12,12 @@
  */
 
 import React, { useState } from "react";
-import { ETAPAS_CONFIG } from "@/lib/constants";
+import { ETAPAS_CONFIG, CODIGOS_CON_ADJUNTOS } from "@/lib/constants";
 import { useRegistrarEtapa } from "@/hooks/useEtapas";
+import { useAuthStore } from "@/stores/authStore";
 import { TablaAreasE11 } from "./TablaAreasE11";
 import { TablaAreasE24 } from "./TablaAreasE24";
+import { AdjuntosEtapa } from "./AdjuntosEtapa";
 import type { EtapaAgrupada, EtapaCreatePayload } from "@/types/etapa";
 
 interface ModalRegistroEtapaProps {
@@ -67,6 +69,8 @@ export function ModalRegistroEtapa({
   areasUsuarias = [],
 }: ModalRegistroEtapaProps) {
   const { mutate: registrar, isPending, isError, error } = useRegistrarEtapa(procesoId);
+  const { user } = useAuthStore();
+  const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
   const camposExtra = getCamposExtra(etapa.cod);
   const isBucle = etapa.es_bucle;
@@ -504,6 +508,16 @@ export function ModalRegistroEtapa({
             </button>
           </div>
         </form>
+
+        {/* C3c — File attachments for key stages (simple, non-por-area branch).
+            Shown only when this stage accepts adjuntos AND a registration row exists.
+            etapa.filas[0].id is the etapa_registro.id for simple (non-por-area) stages. */}
+        {CODIGOS_CON_ADJUNTOS.has(etapa.cod) && (
+          <AdjuntosEtapa
+            etapaId={etapa.filas[0]?.id ?? 0}
+            canEdit={canEdit}
+          />
+        )}
       </div>
     </div>
   );

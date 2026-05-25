@@ -13,7 +13,9 @@
 import React, { useState } from "react";
 import type { FilaArea } from "@/types/etapa";
 import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
+import { useAuthStore } from "@/stores/authStore";
 import { COLORES_ESTADO } from "@/lib/constants";
+import { AdjuntosEtapa } from "./AdjuntosEtapa";
 
 interface TablaAreasE11Props {
   procesoId: number;
@@ -34,6 +36,8 @@ export function TablaAreasE11({
 }: TablaAreasE11Props) {
   const { mutate: registrar, isPending: isRegistrando } = useRegistrarEtapa(procesoId);
   const { mutate: actualizar, isPending: isActualizando } = useActualizarEtapa(procesoId);
+  const { user } = useAuthStore();
+  const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
   // Local row state for editing
   const [rowState, setRowState] = useState<Record<string, RowState>>(() => {
@@ -130,8 +134,8 @@ export function TablaAreasE11({
               const estadoColor = COLORES_ESTADO[estadoKey];
 
               return (
+                <React.Fragment key={area}>
                 <tr
-                  key={area}
                   className="border-b border-gray-100 hover:bg-gray-50"
                   data-testid={`e11-row-${area}`}
                 >
@@ -215,6 +219,16 @@ export function TablaAreasE11({
                     )}
                   </td>
                 </tr>
+                {/* C3c — Adjuntos expansion row per area (E11 is a key stage) */}
+                <tr className="bg-gray-50">
+                  <td colSpan={5} className="pb-2 px-3">
+                    <AdjuntosEtapa
+                      etapaId={fila?.id ?? 0}
+                      canEdit={canEdit}
+                    />
+                  </td>
+                </tr>
+                </React.Fragment>
               );
             })}
           </tbody>

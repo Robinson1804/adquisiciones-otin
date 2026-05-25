@@ -26,17 +26,20 @@ export const COLORES_ESTADO = {
 // ============================================================
 // CATÁLOGO COMPLETO DE ETAPAS — fuente canónica: CONTEXT.md §8
 // 27 entradas: E01–E25 incluyendo E08a y E08b
+// C3c: acepta_adjuntos field mirrors backend CODIGOS_CON_ADJUNTOS (12 key stages).
 // ============================================================
 export const ETAPAS_CONFIG = [
   { cod: 'E01',  area: 'AREAS',       nombre: 'Solicitud de requerimiento TIC (Áreas → OTIN)',
     instruccion: 'Una fila por área. Validar CMN de TODAS antes de avanzar.',
-    campos_extra: ['cmn_adjunto'] },
+    campos_extra: ['cmn_adjunto'], acepta_adjuntos: true as const },
 
   { cod: 'E02',  area: 'OTIN',        nombre: 'Elaboración TDR consolidado (OTIN)',
-    instruccion: 'OTIN consolida todos los requerimientos en un solo TDR.' },
+    instruccion: 'OTIN consolida todos los requerimientos en un solo TDR.',
+    acepta_adjuntos: true as const },
 
   { cod: 'E03',  area: 'OTIN',        nombre: 'Envío indagación de mercado (OTIN → OTA)',
-    instruccion: 'OTIN envía TDR a OTA. Registrar N° oficio.' },
+    instruccion: 'OTIN envía TDR a OTA. Registrar N° oficio.',
+    acepta_adjuntos: true as const },
 
   { cod: 'E04',  area: 'OTA',         nombre: 'OTA deriva expediente a OEAS (OTA → OEAS)',
     instruccion: 'OTA recibe y deriva a OEAS para indagación.' },
@@ -51,7 +54,7 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E07',  area: 'OEAS',        nombre: 'Evaluación técnica (OEAS → OTIN)',
     instruccion: 'OEAS verifica que proveedores cumplen TDR.',
-    campos_extra: ['resultado_eval'] },
+    campos_extra: ['resultado_eval'], acepta_adjuntos: true as const },
 
   { cod: 'E08',  area: 'OTIN',        nombre: 'Respuesta OTIN a evaluación técnica (OTIN → OEAS)',
     instruccion: 'APROBADO → avanza E09. CON OBSERVACIONES → bucle E08a/E08b.',
@@ -67,7 +70,7 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E09',  area: 'OEAS',        nombre: 'Cuadro comparativo (OEAS → OTIN)',
     instruccion: 'Solo cuando eval. técnica APROBADA. Registrar valor EM.',
-    campos_extra: ['monto_cert'] },
+    campos_extra: ['monto_cert'], acepta_adjuntos: true as const },
 
   { cod: 'E10',  area: 'OTIN',        nombre: 'OTIN solicita anexo cert. + valida presupuesto (OTIN → Áreas)',
     instruccion: 'Validar que cada área tenga presupuesto. Sin monto = PROCESO CANCELA.',
@@ -75,24 +78,25 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E11',  area: 'AREAS',       nombre: 'Solicitud cert. presupuestal (cada Área → OTIN)',
     instruccion: 'Una fila por área. Registrar área + monto cert. S/.',
-    por_area: true as const, campos_extra: ['area_usuaria', 'monto_cert'] },
+    por_area: true as const, campos_extra: ['area_usuaria', 'monto_cert'],
+    acepta_adjuntos: true as const },
 
   { cod: 'E12',  area: 'OTIN',        nombre: 'Consolidación cert. presupuestales (OTIN)',
     instruccion: 'Registrar monto total consolidado.' },
 
   { cod: 'E13',  area: 'OTIN',        nombre: 'Envío consolidado a Secretaría General (OTIN → SG)',
-    instruccion: 'Registrar N° oficio.' },
+    instruccion: 'Registrar N° oficio.', acepta_adjuntos: true as const },
 
   { cod: 'E14',  area: 'SEC_GENERAL', nombre: 'Aprobación Secretaría General (SG)',
-    instruccion: 'Registrar N° oficio de aprobación.' },
+    instruccion: 'Registrar N° oficio de aprobación.', acepta_adjuntos: true as const },
 
   { cod: 'E15',  area: 'SEC_GENERAL', nombre: 'Envío a OTPP (Sec. General → OTPP)',
-    instruccion: 'SG remite expediente a OTPP.' },
+    instruccion: 'SG remite expediente a OTPP.', acepta_adjuntos: true as const },
 
   { cod: 'E16',  area: 'OTPP',        nombre: 'Certificación presupuestal — OTPP',
     instruccion: 'Registrar fecha envío Y fecha respuesta. Alerta si >20 días.',
     campos_extra: ['fecha_envio_otpp', 'fecha_resp_otpp'],
-    alerta_dias: 20 as const },
+    alerta_dias: 20 as const, acepta_adjuntos: true as const },
 
   { cod: 'E17',  area: 'OTPP',        nombre: 'OTPP envía a OTA (OTPP → OTA)',
     instruccion: 'OTPP remite expediente certificado a OTA.' },
@@ -102,7 +106,7 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E19',  area: 'OEAS',        nombre: 'Emisión orden de compra/servicio (OEAS)',
     instruccion: 'Registrar N° OCS + monto + plazo. Calcular fecha vencimiento.',
-    campos_extra: ['nro_ocs', 'monto_ocs', 'plazo_entrega'] },
+    campos_extra: ['nro_ocs', 'monto_ocs', 'plazo_entrega'], acepta_adjuntos: true as const },
 
   { cod: 'E20',  area: 'OEAS',        nombre: 'Notificación al proveedor (OEAS → Proveedor)',
     instruccion: 'Registrar fecha de notificación.' },
@@ -118,9 +122,19 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E24',  area: 'AREAS',       nombre: 'Conformidad área usuaria [por área] (Áreas → OTIN)',
     instruccion: 'Una fila por área. Registrar fecha + días demora.',
-    por_area: true as const, campos_extra: ['area_usuaria'] },
+    por_area: true as const, campos_extra: ['area_usuaria'],
+    acepta_adjuntos: true as const },
 
   { cod: 'E25',  area: 'OTIN',        nombre: 'Conformidad final consolidada (OTIN) FIN',
     instruccion: 'FIN DEL PROCESO. Fecha = FECHA_FIN_TOTAL.',
     es_fin: true as const },
 ] as const;
+
+// ============================================================
+// C3c — Set of stage codes that accept file attachments.
+// Mirrors backend CODIGOS_CON_ADJUNTOS (frozenset).
+// Test-sync: both sets must contain exactly these 12 codes.
+// ============================================================
+export const CODIGOS_CON_ADJUNTOS = new Set<string>([
+  'E01', 'E02', 'E03', 'E07', 'E09', 'E11', 'E13', 'E14', 'E15', 'E16', 'E19', 'E24',
+]);

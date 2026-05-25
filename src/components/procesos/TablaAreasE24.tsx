@@ -12,7 +12,9 @@
 import React, { useState } from "react";
 import type { FilaArea } from "@/types/etapa";
 import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
+import { useAuthStore } from "@/stores/authStore";
 import { COLORES_ESTADO } from "@/lib/constants";
+import { AdjuntosEtapa } from "./AdjuntosEtapa";
 
 interface TablaAreasE24Props {
   procesoId: number;
@@ -40,6 +42,8 @@ export function TablaAreasE24({
 }: TablaAreasE24Props) {
   const { mutate: registrar, isPending: isRegistrando } = useRegistrarEtapa(procesoId);
   const { mutate: actualizar, isPending: isActualizando } = useActualizarEtapa(procesoId);
+  const { user } = useAuthStore();
+  const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
   const [rowState, setRowState] = useState<Record<string, RowState>>(() => {
     const state: Record<string, RowState> = {};
@@ -122,8 +126,8 @@ export function TablaAreasE24({
               const diasDemora = calcDiasDemora(fila?.fecha_inicio ?? null);
 
               return (
+                <React.Fragment key={area}>
                 <tr
-                  key={area}
                   className="border-b border-gray-100 hover:bg-gray-50"
                   data-testid={`e24-row-${area}`}
                 >
@@ -191,6 +195,16 @@ export function TablaAreasE24({
                     )}
                   </td>
                 </tr>
+                {/* C3c — Adjuntos expansion row per area (E24 is a key stage) */}
+                <tr className="bg-gray-50">
+                  <td colSpan={5} className="pb-2 px-3">
+                    <AdjuntosEtapa
+                      etapaId={fila?.id ?? 0}
+                      canEdit={canEdit}
+                    />
+                  </td>
+                </tr>
+                </React.Fragment>
               );
             })}
           </tbody>

@@ -118,3 +118,17 @@ export interface MontosProceso {
 export interface EtapaCreatePayloadC3b extends EtapaCreatePayload {
   motivo_cancel?: string;
 }
+
+// ============================================================
+// C3c — File attachment types (mirrors backend ArchivoOut schema)
+// Each ArchivoMeta is tied to a specific etapa_registro row (etapa_id).
+// ============================================================
+export interface ArchivoMeta {
+  id: number;
+  etapa_id: number;
+  nombre_original: string;
+  content_type: string;
+  tamano_bytes: number;
+  subido_por: string;
+  subido_en: string; // ISO datetime string
+}
