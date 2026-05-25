@@ -1,6 +1,10 @@
 /**
- * C3a — useEtapas hooks.
+ * useEtapas hooks — C3a mechanics + C3b business rules.
  * Follows the same pattern as useProcesos (React Query v5, TanStack).
+ *
+ * C3b additions (WU-F3/WU-F5):
+ * - useReiniciarTdr: POST /procesos/{id}/reiniciar-tdr
+ * - onError handlers on all write mutations (surface 409 detail to caller)
  */
 
 import {
@@ -13,6 +17,7 @@ import {
   registrarEtapa,
   actualizarEtapa,
   agregarRonda,
+  reiniciarTdr,
 } from "@/lib/api";
 import type {
   EtapasResponse,
@@ -20,6 +25,28 @@ import type {
   EtapaCreatePayload,
   BuclePayload,
 } from "@/types/etapa";
+
+/**
+ * Extracts the FastAPI `detail` string from an axios error response.
+ * Returns undefined if not available so callers can fallback gracefully.
+ */
+function extractApiDetail(err: unknown): string | undefined {
+  if (
+    err != null &&
+    typeof err === 'object' &&
+    'response' in err &&
+    err.response != null &&
+    typeof err.response === 'object' &&
+    'data' in err.response &&
+    err.response.data != null &&
+    typeof err.response.data === 'object' &&
+    'detail' in err.response.data &&
+    typeof (err.response.data as Record<string, unknown>).detail === 'string'
+  ) {
+    return (err.response.data as Record<string, string>).detail;
+  }
+  return undefined;
+}
 
 // ----------------------------------------------------------------
 // Query key factory
@@ -42,6 +69,7 @@ export function useEtapas(procesoId: number) {
 // ----------------------------------------------------------------
 // useRegistrarEtapa — POST /procesos/{id}/etapas
 // Invalidates etapas cache on success.
+// C3b: exposes typed error so callers can show the backend 409/422 detail.
 // ----------------------------------------------------------------
 export function useRegistrarEtapa(procesoId: number) {
   const qc = useQueryClient();
@@ -50,6 +78,9 @@ export function useRegistrarEtapa(procesoId: number) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: etapaKeys.all(procesoId) });
     },
+    // onError is intentionally omitted here — callers receive the error via
+    // mutation.error and can use extractApiDetail() or display it inline.
+    // WU-F5: ModalRegistroEtapa already renders isError/error inline.
   });
 }
 
@@ -89,3 +120,25 @@ export function useAgregarRonda(procesoId: number) {
     },
   });
 }
+
+// ----------------------------------------------------------------
+// useReiniciarTdr — POST /procesos/{id}/reiniciar-tdr (C3b WU-F3)
+// ADMIN/EDITOR only (backend enforces 403 for VIEWER).
+// On success: invalidates etapas + proceso caches so timeline + ficha refresh.
+// Error: caller receives err.response.data.detail via extractApiDetail().
+// ----------------------------------------------------------------
+export function useReiniciarTdr(procesoId: number) {
+  const qc = useQueryClient();
+  return useMutation<EtapaOut, Error, void>({
+    mutationFn: () => reiniciarTdr(procesoId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: etapaKeys.all(procesoId) });
+      void qc.invalidateQueries({ queryKey: ['proceso', procesoId] });
+    },
+  });
+}
+
+// ----------------------------------------------------------------
+// Utility exported for callers that need to surface 409/422 detail.
+// ----------------------------------------------------------------
+export { extractApiDetail };

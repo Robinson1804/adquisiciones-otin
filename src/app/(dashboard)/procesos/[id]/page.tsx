@@ -11,6 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { useProceso, useActualizarProceso } from "@/hooks/useProcesos";
+import { useMontosProceso } from "@/hooks/useMontosProceso";
 import { LineaTiempo } from "@/components/procesos/LineaTiempo";
 import { COLORES_ESTADO, COLORES_ACTOR } from "@/lib/constants";
 import type { EstadoProceso } from "@/types";
@@ -76,6 +77,11 @@ export default function DetalleProceso() {
 
   const procesoId = Number(params.id);
   const { data: proceso, isLoading, isError } = useProceso(
+    Number.isFinite(procesoId) && procesoId > 0 ? procesoId : null
+  );
+
+  // C3b WU-F4 — montos del proceso (populated as trigger stages complete)
+  const { data: montos } = useMontosProceso(
     Number.isFinite(procesoId) && procesoId > 0 ? procesoId : null
   );
 
@@ -233,13 +239,37 @@ export default function DetalleProceso() {
                 : "—"}
             </FichaRow>
 
+            {/* C3b WU-F4 — Valor EM (from E09 COMPLETADO via montos_proceso) */}
             <FichaRow label="Valor EM">
-              <span className="text-gray-400">— (C3)</span>
+              {montos?.valor_em != null
+                ? `S/ ${montos.valor_em.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : '—'}
             </FichaRow>
 
+            {/* C3b WU-F4 — N° OCS + Monto OCS (from E19 COMPLETADO) */}
             <FichaRow label="N° OCS">
-              <span className="text-gray-400">— (C3)</span>
+              {montos?.nro_ocs ?? '—'}
             </FichaRow>
+
+            {montos?.monto_ocs != null && (
+              <FichaRow label="Monto OCS">
+                {`S/ ${montos.monto_ocs.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </FichaRow>
+            )}
+
+            {montos?.plazo_entrega != null && (
+              <FichaRow label="Plazo Entrega">
+                {`${montos.plazo_entrega} días`}
+              </FichaRow>
+            )}
+
+            {montos?.fecha_inicio_srv && (
+              <FichaRow label="Inicio del Servicio">
+                {new Date(montos.fecha_inicio_srv).toLocaleDateString('es-PE', {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </FichaRow>
+            )}
 
             <FichaRow label="Tiempo Transcurrido">
               {dias === 0
@@ -297,10 +327,11 @@ export default function DetalleProceso() {
           </dl>
         </div>
 
-        {/* Right: Timeline — C3a */}
+        {/* Right: Timeline — C3a/C3b */}
         <LineaTiempo
           procesoId={proceso.id}
           areasUsuarias={proceso.areas_usuarias ?? []}
+          procesoEstado={proceso.estado}
         />
       </div>
     </div>

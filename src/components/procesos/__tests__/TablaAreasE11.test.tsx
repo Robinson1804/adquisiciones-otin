@@ -20,6 +20,7 @@ vi.mock("@/hooks/useEtapas", () => ({
     mutate: vi.fn(),
     isPending: false,
   })),
+  useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {

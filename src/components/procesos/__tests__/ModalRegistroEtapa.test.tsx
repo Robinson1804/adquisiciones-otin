@@ -21,6 +21,7 @@ vi.mock("@/hooks/useEtapas", () => ({
     mutate: vi.fn(),
     isPending: false,
   })),
+  useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 // TablaAreasE11/E24 are mocked to avoid double-testing per-area logic here

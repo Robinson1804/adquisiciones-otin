@@ -24,6 +24,7 @@ vi.mock("@/stores/authStore", () => ({
 vi.mock("@/hooks/useEtapas", () => ({
   useEtapas: vi.fn(),
   useAgregarRonda: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 // Mock ModalRegistroEtapa to avoid deep render

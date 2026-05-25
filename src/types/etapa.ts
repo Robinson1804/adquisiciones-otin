@@ -96,3 +96,25 @@ export interface EtapaCreatePayload {
 export interface BuclePayload {
   motivo_bucle: string;
 }
+
+// ============================================================
+// C3b — MontosProceso (mirrors backend montos_proceso table)
+// Populated as trigger stages complete: E09→valor_em, E12→monto_cert_total,
+// E19→nro_ocs/monto_ocs/plazo_entrega, E22→fecha_inicio_srv.
+// Returned by GET /procesos/{id} or GET /procesos/{id}/montos (Design §WU-F4).
+// ============================================================
+export interface MontosProceso {
+  valor_em: number | null;
+  monto_cert_total: number | null;
+  nro_ocs: string | null;
+  monto_ocs: number | null;
+  plazo_entrega: number | null;
+  fecha_inicio_srv: string | null;
+}
+
+// ============================================================
+// C3b — EtapaCreatePayload extended with motivo_cancel (R2/E10)
+// ============================================================
+export interface EtapaCreatePayloadC3b extends EtapaCreatePayload {
+  motivo_cancel?: string;
+}

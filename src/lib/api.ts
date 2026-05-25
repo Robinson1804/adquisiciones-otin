@@ -12,6 +12,7 @@ import type {
   EtapaOut,
   EtapaCreatePayload,
   BuclePayload,
+  MontosProceso,
 } from "@/types/etapa";
 
 export const api = axios.create({
@@ -117,5 +118,31 @@ export async function agregarRonda(
     `/procesos/${procesoId}/etapas/${cod}/bucle`,
     payload
   );
+  return res.data;
+}
+
+// ============================================================
+// C3b — Reiniciar TDR (POST /procesos/{id}/reiniciar-tdr)
+// Design D3: reopens E02 after E10 SIN_PRESUPUESTO cancellation.
+// ADMIN/EDITOR only — backend enforces; FE gate via useReiniciarTdr.
+// ============================================================
+
+export async function reiniciarTdr(procesoId: number): Promise<EtapaOut> {
+  const res = await api.post<EtapaOut>(`/procesos/${procesoId}/reiniciar-tdr`);
+  return res.data;
+}
+
+// ============================================================
+// C3b — GET /procesos/{id}/montos
+// Returns montos_proceso row for the ficha display (Valor EM, OCS, etc.).
+// Returns null when no trigger stages have completed yet (no row exists).
+// Design §WU-F4: backend may embed montos in GET /procesos/{id} or expose
+// a separate endpoint; using a dedicated endpoint here for clean separation.
+// ============================================================
+
+export async function getMontosProceso(
+  procesoId: number
+): Promise<MontosProceso | null> {
+  const res = await api.get<MontosProceso | null>(`/procesos/${procesoId}/montos`);
   return res.data;
 }

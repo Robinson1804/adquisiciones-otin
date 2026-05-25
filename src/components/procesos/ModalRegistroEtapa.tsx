@@ -471,10 +471,18 @@ export function ModalRegistroEtapa({
             />
           </div>
 
-          {/* Error feedback */}
+          {/* Error feedback — C3b WU-F5: surfaces 409/422 detail from backend */}
           {isError && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2" role="alert">
-              {error instanceof Error ? error.message : 'Error al registrar la etapa.'}
+              {/* Try to extract FastAPI `detail` string from axios error response */}
+              {(
+                error != null &&
+                typeof error === 'object' &&
+                'response' in error &&
+                (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+              )
+                ? (error as { response: { data: { detail: string } } }).response.data.detail
+                : (error instanceof Error ? error.message : 'Error al registrar la etapa.')}
             </div>
           )}
 

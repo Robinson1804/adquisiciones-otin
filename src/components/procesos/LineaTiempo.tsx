@@ -22,6 +22,8 @@ import type { EtapaAgrupada } from "@/types/etapa";
 interface LineaTiempoProps {
   procesoId: number;
   areasUsuarias?: string[];
+  /** C3b: passed to EtapaCard to enable Reiniciar-TDR button on E10 when CANCELADO */
+  procesoEstado?: string;
 }
 
 const LEYENDA: { label: string; key: keyof typeof COLORES_ESTADO }[] = [
@@ -39,7 +41,7 @@ function SkeletonCard() {
   );
 }
 
-export function LineaTiempo({ procesoId, areasUsuarias = [] }: LineaTiempoProps) {
+export function LineaTiempo({ procesoId, areasUsuarias = [], procesoEstado }: LineaTiempoProps) {
   const { data, isLoading, isError, error } = useEtapas(procesoId);
 
   const [modalEtapa, setModalEtapa] = useState<EtapaAgrupada | null>(null);
@@ -146,6 +148,7 @@ export function LineaTiempo({ procesoId, areasUsuarias = [] }: LineaTiempoProps)
                 etapa={etapa}
                 allEtapas={etapas}
                 procesoId={procesoId}
+                procesoEstado={procesoEstado}
                 actionability={actionability}
                 onRegistrar={() => setModalEtapa(etapa)}
               />

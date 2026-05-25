@@ -18,6 +18,11 @@ vi.mock("@/hooks/useProcesos", () => ({
   useActualizarProceso: vi.fn(),
 }));
 
+// C3b: mock useMontosProceso so S4 tests don't need a real backend
+vi.mock("@/hooks/useMontosProceso", () => ({
+  useMontosProceso: vi.fn(() => ({ data: null, isLoading: false, isError: false })),
+}));
+
 // Mock LineaTiempo so S4 tests stay focused on the ficha panel
 vi.mock("@/components/procesos/LineaTiempo", () => ({
   LineaTiempo: () =>

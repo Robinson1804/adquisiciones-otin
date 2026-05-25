@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { useEtapas, useRegistrarEtapa } from "@/hooks/useEtapas";
+import { useEtapas, useRegistrarEtapa, useReiniciarTdr } from "@/hooks/useEtapas";
 import type { EtapasResponse, EtapaOut } from "@/types/etapa";
 
 // Mock the entire api module
@@ -21,9 +21,11 @@ vi.mock("@/lib/api", () => ({
   registrarEtapa: vi.fn(),
   actualizarEtapa: vi.fn(),
   agregarRonda: vi.fn(),
+  reiniciarTdr: vi.fn(),
+  getMontosProceso: vi.fn(),
 }));
 
-import { getEtapas, registrarEtapa } from "@/lib/api";
+import { getEtapas, registrarEtapa, reiniciarTdr } from "@/lib/api";
 
 function makeEtapa(cod: string, estado = 'PENDIENTE') {
   return {
@@ -94,6 +96,67 @@ describe("useEtapas", () => {
 
     const { result } = renderHook(() => useEtapas(1), {
       wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+// ----------------------------------------------------------------
+// C3b WU-F6 — useReiniciarTdr
+// ----------------------------------------------------------------
+
+describe("useReiniciarTdr", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls reiniciarTdr and invalidates etapas + proceso caches on success", async () => {
+    const mockEtapaOut: EtapaOut = {
+      id: 99,
+      codigo_etapa: 'E02',
+      nro_ronda: 2,
+      area_usuaria: null,
+      estado_etapa: 'PENDIENTE',
+      fecha_inicio: null,
+      fecha_fin: null,
+      dias: null,
+    };
+    vi.mocked(reiniciarTdr).mockResolvedValueOnce(mockEtapaOut);
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: qc }, children);
+
+    const { result } = renderHook(() => useReiniciarTdr(5), { wrapper });
+
+    await act(async () => {
+      result.current.mutate();
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(reiniciarTdr).toHaveBeenCalledWith(5);
+    // Both etapas and proceso caches should be invalidated
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['etapas', 5] })
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['proceso', 5] })
+    );
+  });
+
+  it("surfaces error when reiniciarTdr rejects", async () => {
+    vi.mocked(reiniciarTdr).mockRejectedValueOnce(new Error("409 Conflict"));
+
+    const { result } = renderHook(() => useReiniciarTdr(5), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate();
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));

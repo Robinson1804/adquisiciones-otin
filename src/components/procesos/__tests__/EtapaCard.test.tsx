@@ -19,9 +19,14 @@ vi.mock("@/hooks/useEtapas", () => ({
     mutate: vi.fn(),
     isPending: false,
   })),
+  useReiniciarTdr: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
 }));
 
 import { useAuthStore } from "@/stores/authStore";
+import type { FilaArea } from "@/types/etapa";
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -179,6 +184,106 @@ describe("EtapaCard", () => {
     );
 
     expect(screen.getByText(/Inicio del plazo del servicio\/bien/i)).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------
+  // C3b WU-F3: Reiniciar-TDR button
+  // ---------------------------------------------------------------
+
+  it("E10 card with CANCELADO + SIN_PRESUPUESTO shows Reiniciar TDR button (EDITOR)", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', {
+      filas: [{
+        id: 1, area_usuaria: 'OTIN', estado_etapa: 'COMPLETADO',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        resultado_eval: 'SIN_PRESUPUESTO',
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        procesoEstado: 'CANCELADO',
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByRole('button', { name: /Reiniciar TDR/i })).toBeInTheDocument();
+  });
+
+  it("E10 card in EN PROCESO does NOT show Reiniciar TDR button", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', {
+      filas: [{
+        id: 1, area_usuaria: 'OTIN', estado_etapa: 'COMPLETADO',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        resultado_eval: 'VALIDADO',
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        procesoEstado: 'EN PROCESO',
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /Reiniciar TDR/i })).not.toBeInTheDocument();
+  });
+
+  it("VIEWER does not see Reiniciar TDR button even when proceso CANCELADO", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 2, username: "viewer", nombre_completo: "Viewer", rol: "VIEWER", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', {
+      filas: [{
+        id: 1, area_usuaria: 'OTIN', estado_etapa: 'COMPLETADO',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        resultado_eval: 'SIN_PRESUPUESTO',
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        procesoEstado: 'CANCELADO',
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /Reiniciar TDR/i })).not.toBeInTheDocument();
   });
 
   it("COLORES_ACTOR applied — card has correct area color", () => {

@@ -2,10 +2,10 @@
  * etapaRules.ts — Pure functions for etapa prerequisite/actionability logic.
  *
  * C3a: permissive — returns true (actionable) for all stages.
- * C3b: will tighten prerequisite enforcement using ETAPAS_CONFIG.prerequisitos.
+ * C3b: tightened — encodes R1/R6/R7/E12/E25 prerequisite logic per Design §LAS 8 REGLAS.
  *
- * KEEP THIS AS A PURE FUNCTION over etapas data so C3b can extend without
- * rewriting the UI components.
+ * KEEP THIS AS A PURE FUNCTION over etapas data so UI components stay decoupled.
+ * Backend is the source of truth (returns 409); this is defense-in-depth / UX.
  */
 
 import type { EtapaAgrupada } from "@/types/etapa";
@@ -19,25 +19,50 @@ export interface EtapaActionability {
 
 /**
  * Map of prerequisite relationships.
- * Mirrors ETAPAS_CONFIG prerequisitos from backend (Design D1).
- * C3b will use this to enforce strict blocking.
+ * Mirrors etapas_catalogo.py prerequisitos from backend (Design D1).
+ * C3b: extended with R6/R7 and E08a/E08b.
  */
-const PREREQUISITOS: Record<string, string[]> = {
-  E02: ['E01'],
-  E05: ['E04'],
-  E06: ['E04'],
-  E09: ['E08'],
-  E12: ['E11'],
-  E25: ['E24'],
+export const PREREQUISITOS: Record<string, string[]> = {
+  E02: ['E01'],       // R1 — all E01 areas must have cmn_adjunto='SI'
+  E05: ['E04'],       // R6 — E04 must be COMPLETADO
+  E06: ['E04'],       // R6
+  E08a: ['E08'],
+  E08b: ['E08'],
+  E09: ['E08'],       // R7 — E08 must be COMPLETADO (BE also checks resultado_eval=APROBADO)
+  E12: ['E11'],       // R3 — all E11 areas must be COMPLETADO
+  E25: ['E24'],       // R5 — all E24 areas must be COMPLETADO
 };
 
 /**
- * Returns actionability for a given stage given the full list of etapas.
+ * Human-readable block messages per (cod, prereqCod) pair.
+ * Mirrors the Spanish messages from backend validaciones.py (Design §LAS 8 REGLAS).
+ */
+const BLOCK_MESSAGES: Record<string, string> = {
+  'E02:E01': 'Todas las áreas deben tener CMN = SI antes de iniciar E02',
+  'E05:E04': 'E04 debe estar COMPLETADO antes de iniciar bucle TDR (E05/E06)',
+  'E06:E04': 'E04 debe estar COMPLETADO antes de iniciar bucle TDR (E05/E06)',
+  'E08a:E08': 'E08 debe estar COMPLETADO antes de registrar E08a',
+  'E08b:E08': 'E08 debe estar COMPLETADO antes de registrar E08b',
+  'E09:E08': 'E08 debe tener resultado APROBADO antes de registrar E09',
+  'E12:E11': 'Todas las áreas deben completar certificación presupuestal (E11) antes de consolidar',
+  'E25:E24': 'Todas las áreas deben registrar conformidad (E24) antes de finalizar',
+};
+
+function blockMessage(cod: string, prereqCod: string): string {
+  return BLOCK_MESSAGES[`${cod}:${prereqCod}`] ?? `${prereqCod} debe estar COMPLETADO antes de registrar ${cod}`;
+}
+
+/**
+ * C3b — Returns actionability for a given stage given the full list of etapas.
  *
- * C3a: Checks prerequisite stages are COMPLETADO (UI-only defense).
- * The backend is the source of truth — this is defense-in-depth only.
+ * Encodes:
+ * - R1: E02 blocked when any E01 fila has cmn_adjunto != 'SI'
+ * - R6: E05/E06 blocked when E04 not COMPLETADO
+ * - R7: E09 blocked when E08 not COMPLETADO
+ * - R3/R5: E12/E25 blocked when per-area rows have PENDIENTE entries
+ * - Generic prereq: any stage in PREREQUISITOS
  *
- * C3b: Will call validaciones.py equivalent logic here.
+ * Backend is the source of truth — this is defense-in-depth (UX only).
  */
 export function getEtapaActionability(
   etapa: EtapaAgrupada,
@@ -47,11 +72,55 @@ export function getEtapaActionability(
 
   for (const prereqCod of prereqs) {
     const prereqEtapa = allEtapas.find((e) => e.cod === prereqCod);
+
+    // Prereq stage not found or not completed
     if (!prereqEtapa || prereqEtapa.estado !== 'COMPLETADO') {
       return {
         canRegister: false,
-        blockedReason: `${prereqCod} debe estar COMPLETADO antes de registrar ${etapa.cod}`,
+        blockedReason: blockMessage(etapa.cod, prereqCod),
       };
+    }
+
+    // R1: E02 — additionally check all E01 filas have cmn_adjunto='SI'
+    if (etapa.cod === 'E02' && prereqCod === 'E01') {
+      const sinCmn = (prereqEtapa.filas ?? []).filter(
+        (f) => f.cmn_adjunto !== 'SI'
+      );
+      if (sinCmn.length > 0) {
+        const areas = sinCmn.map((f) => f.area_usuaria).join(', ');
+        return {
+          canRegister: false,
+          blockedReason: `CMN pendiente en áreas: ${areas}`,
+        };
+      }
+    }
+
+    // R3: E12 — check no E11 filas are PENDIENTE
+    if (etapa.cod === 'E12' && prereqCod === 'E11') {
+      const pendientes = (prereqEtapa.filas ?? []).filter(
+        (f) => f.estado_etapa === 'PENDIENTE'
+      );
+      if (pendientes.length > 0) {
+        const areas = pendientes.map((f) => f.area_usuaria).join(', ');
+        return {
+          canRegister: false,
+          blockedReason: `No se puede consolidar: áreas E11 pendientes: ${areas}`,
+        };
+      }
+    }
+
+    // R5: E25 — check no E24 filas are PENDIENTE
+    if (etapa.cod === 'E25' && prereqCod === 'E24') {
+      const pendientes = (prereqEtapa.filas ?? []).filter(
+        (f) => f.estado_etapa === 'PENDIENTE'
+      );
+      if (pendientes.length > 0) {
+        const areas = pendientes.map((f) => f.area_usuaria).join(', ');
+        return {
+          canRegister: false,
+          blockedReason: `No conformidad final: áreas E24 pendientes: ${areas}`,
+        };
+      }
     }
   }
 
