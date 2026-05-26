@@ -20,6 +20,11 @@ export interface FilaArea {
   fecha_envio_otpp?: string;
   fecha_resp_otpp?: string;
   vencimiento_ocs?: string | null;
+  // Common fields (backend FilaAreaOut returns these — used to prefill the modal)
+  responsable?: string | null;
+  oficio_correo?: string | null;
+  observaciones?: string | null;
+  motivo_bucle?: string | null;
 }
 
 export interface RondaBucle {

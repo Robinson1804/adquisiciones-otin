@@ -15,12 +15,16 @@ import type { FilaArea } from "@/types/etapa";
 import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 import { useAuthStore } from "@/stores/authStore";
 import { COLORES_ESTADO } from "@/lib/constants";
+import { getDiasDemoraArea } from "@/lib/etapaRules";
+import { formatFechaCorta } from "@/lib/fecha";
 import { AdjuntosEtapa } from "./AdjuntosEtapa";
 
 interface TablaAreasE11Props {
   procesoId: number;
   filas: FilaArea[];
   areasUsuarias: string[];
+  /** Start of the chain for this stage (previous stage end) — used for días de demora. */
+  fechaInicioChain?: string | null;
 }
 
 interface RowState {
@@ -33,6 +37,7 @@ export function TablaAreasE11({
   procesoId,
   filas,
   areasUsuarias,
+  fechaInicioChain = null,
 }: TablaAreasE11Props) {
   const { mutate: registrar, isPending: isRegistrando } = useRegistrarEtapa(procesoId);
   const { mutate: actualizar, isPending: isActualizando } = useActualizarEtapa(procesoId);
@@ -122,6 +127,7 @@ export function TablaAreasE11({
               <th className="text-right py-2 px-3 text-xs font-semibold text-gray-600">Monto Cert. S/.</th>
               <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">Estado</th>
               <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600">Fecha</th>
+              <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">Días demora</th>
               <th className="py-2 px-3 text-xs font-semibold text-gray-600">Acciones</th>
             </tr>
           </thead>
@@ -132,6 +138,10 @@ export function TablaAreasE11({
               const estado = fila?.estado_etapa ?? 'PENDIENTE';
               const estadoKey = (estado === 'EN_CURSO' ? 'EN_CURSO' : estado === 'COMPLETADO' ? 'COMPLETADO' : 'PENDIENTE') as keyof typeof COLORES_ESTADO;
               const estadoColor = COLORES_ESTADO[estadoKey];
+              const diasDemora = getDiasDemoraArea(
+                fila?.fecha_inicio ?? null,
+                fechaInicioChain
+              );
 
               return (
                 <React.Fragment key={area}>
@@ -175,17 +185,18 @@ export function TablaAreasE11({
                       <input
                         type="date"
                         value={row.fecha}
+                        min={fechaInicioChain ?? undefined}
                         onChange={(e) => updateField(area, 'fecha', e.target.value)}
                         className="border border-gray-300 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
                         aria-label={`Fecha para ${area}`}
                       />
                     ) : (
-                      <span>
-                        {fila?.fecha_inicio
-                          ? new Date(fila.fecha_inicio).toLocaleDateString('es-PE')
-                          : '—'}
-                      </span>
+                      <span>{formatFechaCorta(fila?.fecha_inicio)}</span>
                     )}
+                  </td>
+
+                  <td className="py-2 px-3 text-center text-gray-700">
+                    {diasDemora !== null ? `${diasDemora} d` : '—'}
                   </td>
 
                   <td className="py-2 px-3">
@@ -221,7 +232,7 @@ export function TablaAreasE11({
                 </tr>
                 {/* C3c — Adjuntos expansion row per area (E11 is a key stage) */}
                 <tr className="bg-gray-50">
-                  <td colSpan={5} className="pb-2 px-3">
+                  <td colSpan={6} className="pb-2 px-3">
                     <AdjuntosEtapa
                       etapaId={fila?.id ?? 0}
                       canEdit={canEdit}
@@ -240,7 +251,7 @@ export function TablaAreasE11({
               <td className="py-2 px-3 text-right text-sm font-bold text-gray-800" data-testid="e11-total">
                 S/ {runningTotal.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
               </td>
-              <td colSpan={3} />
+              <td colSpan={4} />
             </tr>
           </tfoot>
         </table>

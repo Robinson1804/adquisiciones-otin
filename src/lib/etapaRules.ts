@@ -161,3 +161,72 @@ export function getLatestRonda(etapa: EtapaAgrupada): number | null {
   if (!etapa.es_bucle || etapa.rondas.length === 0) return null;
   return Math.max(...etapa.rondas.map((r) => r.nro_ronda));
 }
+
+// ---------------------------------------------------------------------------
+// Date chaining — stages are consecutive: a stage "starts" when the previous
+// chain stage ended. Used to (a) prefill fecha_inicio of a new registration
+// and (b) compute "días de demora" of per-area rows as (fecha − chain start).
+// ISO date strings (YYYY-MM-DD) compare correctly with string ordering.
+// ---------------------------------------------------------------------------
+
+/** Latest end date of a stage: max(fecha_fin ?? fecha_inicio) across its filas. */
+export function getFechaFinEtapa(etapa: EtapaAgrupada | undefined): string | null {
+  if (!etapa) return null;
+  const fechas = etapa.filas
+    .map((f) => f.fecha_fin ?? f.fecha_inicio)
+    .filter((d): d is string => !!d);
+  if (fechas.length === 0) return null;
+  return fechas.reduce((max, d) => (d > max ? d : max));
+}
+
+/** Latest date among a loop stage's rounds: max(fecha_fin ?? fecha_inicio). */
+function getUltimaRondaFecha(etapa: EtapaAgrupada | undefined): string | null {
+  if (!etapa || etapa.rondas.length === 0) return null;
+  const fechas = etapa.rondas
+    .map((r) => r.fecha_fin ?? r.fecha_inicio)
+    .filter((d): d is string => !!d);
+  if (fechas.length === 0) return null;
+  return fechas.reduce((max, d) => (d > max ? d : max));
+}
+
+/**
+ * Suggested start date for a stage = end date of its chain prerequisite(s).
+ * Returns null for the root stage (E01) or when no prerequisite has a date yet.
+ *
+ * Indagación de mercado: la evaluación técnica (E07) "comienza a correr" desde el
+ * envío/derivación normal (E04). Pero si hubo corrección del TDR (bucle E06), el
+ * reloj arranca desde la ÚLTIMA corrección que mandó OTIN — así la demora de la
+ * evaluación no arrastra el tiempo de las observaciones.
+ */
+export function getFechaInicioSugerida(
+  cod: string,
+  allEtapas: EtapaAgrupada[]
+): string | null {
+  const prereqs = PREREQUISITOS[cod] ?? [];
+  let best: string | null = null;
+  for (const pc of prereqs) {
+    const fin = getFechaFinEtapa(allEtapas.find((e) => e.cod === pc));
+    if (fin && (best === null || fin > best)) best = fin;
+  }
+  if (cod === "E07") {
+    const ultimaCorreccion = getUltimaRondaFecha(
+      allEtapas.find((e) => e.cod === "E06")
+    );
+    if (ultimaCorreccion && (best === null || ultimaCorreccion > best)) {
+      best = ultimaCorreccion;
+    }
+  }
+  return best;
+}
+
+/** Días de demora of a per-area row = (fecha del área − inicio encadenado). */
+export function getDiasDemoraArea(
+  fechaArea: string | null | undefined,
+  chainStart: string | null
+): number | null {
+  if (!fechaArea || !chainStart) return null;
+  const diff = Math.floor(
+    (new Date(fechaArea).getTime() - new Date(chainStart).getTime()) / 86_400_000
+  );
+  return diff >= 0 ? diff : null;
+}

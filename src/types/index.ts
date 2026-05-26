@@ -56,6 +56,8 @@ export interface ProcesoCreatePayload {
   pim?: number | null;
   anno: number;
   cmn_por_area: { area: string; cmn_adjunto: "SI" | "NO" }[];
+  /** ISO date (YYYY-MM-DD). When set, E01 is auto-completed as the process kickoff. */
+  fecha_solicitud?: string | null;
 }
 
 export interface ProcesoUpdatePayload {

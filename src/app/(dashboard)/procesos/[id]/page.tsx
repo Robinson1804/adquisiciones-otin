@@ -15,6 +15,7 @@ import { useMontosProceso } from "@/hooks/useMontosProceso";
 import { useExportProcesoPdf } from "@/hooks/useExport";
 import { LineaTiempo } from "@/components/procesos/LineaTiempo";
 import { COLORES_ESTADO, COLORES_ACTOR } from "@/lib/constants";
+import { formatFechaCorta, formatFechaLarga } from "@/lib/fecha";
 import type { EstadoProceso } from "@/types";
 
 // ----------------------------------------------------------------
@@ -291,9 +292,7 @@ export default function DetalleProceso() {
 
             {montos?.fecha_inicio_srv && (
               <FichaRow label="Inicio del Servicio">
-                {new Date(montos.fecha_inicio_srv).toLocaleDateString('es-PE', {
-                  year: 'numeric', month: 'long', day: 'numeric',
-                })}
+                {formatFechaLarga(montos.fecha_inicio_srv)}
               </FichaRow>
             )}
 

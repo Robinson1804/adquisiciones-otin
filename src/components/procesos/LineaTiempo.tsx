@@ -15,7 +15,7 @@ import React, { useState } from "react";
 import { useEtapas } from "@/hooks/useEtapas";
 import { EtapaCard } from "./EtapaCard";
 import { ModalRegistroEtapa } from "./ModalRegistroEtapa";
-import { getEtapaActionability } from "@/lib/etapaRules";
+import { getEtapaActionability, getFechaInicioSugerida } from "@/lib/etapaRules";
 import { COLORES_ESTADO } from "@/lib/constants";
 import type { EtapaAgrupada } from "@/types/etapa";
 
@@ -165,6 +165,7 @@ export function LineaTiempo({ procesoId, areasUsuarias = [], procesoEstado }: Li
           open={true}
           onClose={() => setModalEtapa(null)}
           areasUsuarias={areasUsuarias}
+          fechaInicioSugerida={getFechaInicioSugerida(modalEtapa.cod, etapas)}
         />
       )}
     </div>

@@ -168,8 +168,8 @@ export async function getMontosProceso(
 // ============================================================
 
 export async function getArchivos(etapaId: number): Promise<ArchivoMeta[]> {
-  const res = await api.get<ArchivoMeta[]>(`/etapas/${etapaId}/archivos`);
-  return res.data;
+  const res = await api.get<{ archivos: ArchivoMeta[] }>(`/etapas/${etapaId}/archivos`);
+  return res.data.archivos;
 }
 
 export async function subirArchivo(

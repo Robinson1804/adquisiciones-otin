@@ -10,6 +10,7 @@ import React, { useState } from "react";
 import type { RondaBucle } from "@/types/etapa";
 import { useAgregarRonda } from "@/hooks/useEtapas";
 import { COLORES_ACTOR } from "@/lib/constants";
+import { formatFechaCorta } from "@/lib/fecha";
 
 interface RondasListProps {
   rondas: RondaBucle[];
@@ -98,8 +99,8 @@ export function RondasList({
               <p className="text-gray-700">{ronda.motivo_bucle}</p>
               {ronda.fecha_inicio && (
                 <span className="text-gray-500">
-                  {new Date(ronda.fecha_inicio).toLocaleDateString('es-PE')}
-                  {ronda.fecha_fin && ` – ${new Date(ronda.fecha_fin).toLocaleDateString('es-PE')}`}
+                  {formatFechaCorta(ronda.fecha_inicio)}
+                  {ronda.fecha_fin && ` – ${formatFechaCorta(ronda.fecha_fin)}`}
                 </span>
               )}
             </li>

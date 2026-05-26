@@ -19,6 +19,14 @@ import { useCrearProceso } from "@/hooks/useProcesos";
 // ----------------------------------------------------------------
 const CURRENT_YEAR = new Date().getFullYear();
 
+// Local "today" as YYYY-MM-DD (avoids UTC off-by-one for the date input default).
+const TODAY_ISO = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+})();
+
 const AREAS_VALIDAS = [
   "DTDIS",
   "GOBERNANZA",
@@ -50,6 +58,9 @@ const procesoSchema = z.object({
     z.number().min(0, "El PIM no puede ser negativo").optional()
   ),
   anno: z.number().min(2020).max(2100),
+  fecha_solicitud: z
+    .string()
+    .min(1, "La fecha de solicitud es requerida"),
   cmn_por_area: z.array(cmnPorAreaSchema),
 });
 
@@ -118,6 +129,7 @@ export default function NuevoProcesoPage() {
       areas_usuarias: [],
       pim: undefined,
       anno: CURRENT_YEAR,
+      fecha_solicitud: TODAY_ISO,
       cmn_por_area: [],
     },
   });
@@ -160,6 +172,7 @@ export default function NuevoProcesoPage() {
         areas_usuarias: data.areas_usuarias,
         pim: data.pim ?? null,
         anno: data.anno,
+        fecha_solicitud: data.fecha_solicitud,
         cmn_por_area: data.cmn_por_area.map((c) => ({
           area: c.area,
           cmn_adjunto: c.cmn_adjunto,
@@ -228,6 +241,27 @@ export default function NuevoProcesoPage() {
                 className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <FieldError message={errors.anno?.message} />
+            </div>
+
+            {/* Fecha de Solicitud — registra E01 (arranque del proceso) */}
+            <div>
+              <label
+                htmlFor="fecha_solicitud"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                Fecha de Solicitud <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="fecha_solicitud"
+                type="date"
+                {...register("fecha_solicitud")}
+                className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                aria-required="true"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Fecha en que el área solicitó el requerimiento. Registra E01 automáticamente.
+              </p>
+              <FieldError message={errors.fecha_solicitud?.message} />
             </div>
 
             {/* Unidad Solicitante */}

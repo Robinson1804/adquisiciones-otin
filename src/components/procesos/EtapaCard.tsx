@@ -18,6 +18,7 @@ import { useAuthStore } from "@/stores/authStore";
 import type { EtapaAgrupada } from "@/types/etapa";
 import type { EtapaActionability } from "@/lib/etapaRules";
 import { getLatestRonda } from "@/lib/etapaRules";
+import { formatFechaCorta } from "@/lib/fecha";
 import { AlertaE16 } from "./AlertaE16";
 import { RondasList } from "./RondasList";
 import { useReiniciarTdr } from "@/hooks/useEtapas";
@@ -90,6 +91,21 @@ export function EtapaCard({
   const fechaFin = primeraFila?.fecha_fin ?? null;
   const dias = primeraFila?.dias ?? null;
 
+  // Action button label: a stage that already has progress shows "Editar"
+  // (open to review/edit); a fresh registrable stage shows "Registrar".
+  const yaRegistrada =
+    etapa.estado === 'COMPLETADO' || etapa.estado === 'EN_CURSO';
+  const accionLabel = !actionability.canRegister
+    ? 'Bloqueado'
+    : yaRegistrada
+      ? 'Editar'
+      : 'Registrar';
+  const accionAriaLabel = !actionability.canRegister
+    ? `${etapa.cod} bloqueado: ${actionability.blockedReason ?? ''}`
+    : yaRegistrada
+      ? `Editar etapa ${etapa.cod}`
+      : `Registrar avance de ${etapa.cod}`;
+
   return (
     <article
       className="rounded-lg p-3 relative"
@@ -147,22 +163,8 @@ export function EtapaCard({
           {/* Date info for non-loop, non-per-area stages */}
           {!isBucle && !etapa.por_area && (
             <div className="flex gap-3 text-xs mt-0.5" style={{ color: actorColor.text }}>
-              {fechaInicio && (
-                <span>
-                  Inicio:{' '}
-                  {new Date(fechaInicio).toLocaleDateString('es-PE', {
-                    day: '2-digit', month: '2-digit', year: '2-digit',
-                  })}
-                </span>
-              )}
-              {fechaFin && (
-                <span>
-                  Fin:{' '}
-                  {new Date(fechaFin).toLocaleDateString('es-PE', {
-                    day: '2-digit', month: '2-digit', year: '2-digit',
-                  })}
-                </span>
-              )}
+              {fechaInicio && <span>Inicio: {formatFechaCorta(fechaInicio)}</span>}
+              {fechaFin && <span>Fin: {formatFechaCorta(fechaFin)}</span>}
               {dias !== null && <span>{dias} d</span>}
             </div>
           )}
@@ -193,14 +195,10 @@ export function EtapaCard({
                 color: actorColor.text,
                 backgroundColor: 'white',
               }}
-              aria-label={
-                actionability.canRegister
-                  ? `Registrar avance de ${etapa.cod}`
-                  : `${etapa.cod} bloqueado: ${actionability.blockedReason ?? ''}`
-              }
+              aria-label={accionAriaLabel}
               aria-disabled={!actionability.canRegister}
             >
-              {actionability.canRegister ? 'Registrar' : 'Bloqueado'}
+              {accionLabel}
             </button>
             {/* Tooltip for blocked stages */}
             {!actionability.canRegister && actionability.blockedReason && (

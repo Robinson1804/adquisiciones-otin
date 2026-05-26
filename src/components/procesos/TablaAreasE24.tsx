@@ -14,12 +14,21 @@ import type { FilaArea } from "@/types/etapa";
 import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 import { useAuthStore } from "@/stores/authStore";
 import { COLORES_ESTADO } from "@/lib/constants";
+import { getDiasDemoraArea } from "@/lib/etapaRules";
+import { formatFechaCorta } from "@/lib/fecha";
 import { AdjuntosEtapa } from "./AdjuntosEtapa";
 
 interface TablaAreasE24Props {
   procesoId: number;
   filas: FilaArea[];
   areasUsuarias: string[];
+  /** Start of the chain for this stage (previous stage end) — used for días de demora. */
+  fechaInicioChain?: string | null;
+  /** Column label for the date — E24 uses "Fecha conformidad", E01 "Fecha de solicitud". */
+  fechaLabel?: string;
+  /** codigo_etapa actually registered by this table (E24 default; E01 reuses it). */
+  codigoEtapa?: string;
+  nombreEtapa?: string;
 }
 
 interface RowState {
@@ -27,18 +36,14 @@ interface RowState {
   editing: boolean;
 }
 
-function calcDiasDemora(fechaConformidad: string | null): number | null {
-  if (!fechaConformidad) return null;
-  const fecha = new Date(fechaConformidad);
-  const hoy = new Date();
-  const diff = Math.floor((hoy.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24));
-  return diff >= 0 ? diff : null;
-}
-
 export function TablaAreasE24({
   procesoId,
   filas,
   areasUsuarias,
+  fechaInicioChain = null,
+  fechaLabel = "Fecha conformidad",
+  codigoEtapa = "E24",
+  nombreEtapa = "Conformidad area usuaria [por area] (Areas - OTIN)",
 }: TablaAreasE24Props) {
   const { mutate: registrar, isPending: isRegistrando } = useRegistrarEtapa(procesoId);
   const { mutate: actualizar, isPending: isActualizando } = useActualizarEtapa(procesoId);
@@ -90,8 +95,8 @@ export function TablaAreasE24({
     } else {
       registrar(
         {
-          codigo_etapa: 'E24',
-          nombre_etapa: 'Conformidad area usuaria [por area] (Areas - OTIN)',
+          codigo_etapa: codigoEtapa,
+          nombre_etapa: nombreEtapa,
           fecha_inicio: fecha,
           estado_etapa: 'COMPLETADO',
           area_usuaria: area,
@@ -110,7 +115,7 @@ export function TablaAreasE24({
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600">Area</th>
-              <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600">Fecha conformidad</th>
+              <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600">{fechaLabel}</th>
               <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">Dias demora</th>
               <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">Estado</th>
               <th className="py-2 px-3 text-xs font-semibold text-gray-600">Acciones</th>
@@ -123,7 +128,10 @@ export function TablaAreasE24({
               const estado = fila?.estado_etapa ?? 'PENDIENTE';
               const estadoKey = (estado === 'COMPLETADO' ? 'COMPLETADO' : estado === 'EN_CURSO' ? 'EN_CURSO' : 'PENDIENTE') as keyof typeof COLORES_ESTADO;
               const estadoColor = COLORES_ESTADO[estadoKey];
-              const diasDemora = calcDiasDemora(fila?.fecha_inicio ?? null);
+              const diasDemora = getDiasDemoraArea(
+                fila?.fecha_inicio ?? null,
+                fechaInicioChain
+              );
 
               return (
                 <React.Fragment key={area}>
@@ -138,16 +146,13 @@ export function TablaAreasE24({
                       <input
                         type="date"
                         value={row.fecha}
+                        min={fechaInicioChain ?? undefined}
                         onChange={(e) => updateFecha(area, e.target.value)}
                         className="border border-gray-300 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-                        aria-label={`Fecha conformidad para ${area}`}
+                        aria-label={`${fechaLabel} para ${area}`}
                       />
                     ) : (
-                      <span>
-                        {fila?.fecha_inicio
-                          ? new Date(fila.fecha_inicio).toLocaleDateString('es-PE')
-                          : '—'}
-                      </span>
+                      <span>{formatFechaCorta(fila?.fecha_inicio)}</span>
                     )}
                   </td>
 

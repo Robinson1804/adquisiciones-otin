@@ -26,6 +26,8 @@ interface ModalRegistroEtapaProps {
   open: boolean;
   onClose: () => void;
   areasUsuarias?: string[];
+  /** Suggested start date = end date of the previous chain stage (consecutive flow). */
+  fechaInicioSugerida?: string | null;
 }
 
 // Derive campos_extra for a given stage code from ETAPAS_CONFIG
@@ -67,6 +69,7 @@ export function ModalRegistroEtapa({
   open,
   onClose,
   areasUsuarias = [],
+  fechaInicioSugerida = null,
 }: ModalRegistroEtapaProps) {
   const { mutate: registrar, isPending, isError, error } = useRegistrarEtapa(procesoId);
   const { user } = useAuthStore();
@@ -76,29 +79,63 @@ export function ModalRegistroEtapa({
   const isBucle = etapa.es_bucle;
   const isPorArea = etapa.por_area;
 
+  // Existing registration for simple stages — used to prefill the form when
+  // reopening an already-registered/completed stage. Bucle stages always add a
+  // fresh round, so they are never prefilled.
+  const filaExistente = isBucle ? undefined : etapa.filas[0];
+  const numOrEmpty = (v: number | null | undefined) =>
+    v != null ? String(v) : "";
+
   // Compute next ronda number for display (display-only)
   const nextRonda =
     isBucle && etapa.rondas.length > 0
       ? Math.max(...etapa.rondas.map((r) => r.nro_ronda)) + 1
       : 1;
 
-  // Form state
-  const [fechaInicio, setFechaInicio] = useState("");
-  const [fechaFin, setFechaFin] = useState("");
-  const [estadoEtapa, setEstadoEtapa] = useState<string>("EN_CURSO");
-  const [responsable, setResponsable] = useState("");
-  const [oficioCorreo, setOficioCorreo] = useState("");
-  const [observaciones, setObservaciones] = useState("");
+  // Form state — prefilled from the existing row; for a new registration,
+  // fecha_inicio defaults to the previous chain stage's end (consecutive flow).
+  const [fechaInicio, setFechaInicio] = useState(
+    () => filaExistente?.fecha_inicio ?? fechaInicioSugerida ?? ""
+  );
+  const [fechaFin, setFechaFin] = useState(() => filaExistente?.fecha_fin ?? "");
+  const [estadoEtapa, setEstadoEtapa] = useState<string>(
+    () => filaExistente?.estado_etapa ?? "EN_CURSO"
+  );
+  const [responsable, setResponsable] = useState(
+    () => filaExistente?.responsable ?? ""
+  );
+  const [oficioCorreo, setOficioCorreo] = useState(
+    () => filaExistente?.oficio_correo ?? ""
+  );
+  const [observaciones, setObservaciones] = useState(
+    () => filaExistente?.observaciones ?? ""
+  );
   // campos_extra fields
-  const [cmnAdjunto, setCmnAdjunto] = useState<string>("PENDIENTE");
-  const [montoCert, setMontoCert] = useState<string>("");
-  const [resultadoEval, setResultadoEval] = useState<string>("");
+  const [cmnAdjunto, setCmnAdjunto] = useState<string>(
+    () => filaExistente?.cmn_adjunto ?? "PENDIENTE"
+  );
+  const [montoCert, setMontoCert] = useState<string>(
+    () => numOrEmpty(filaExistente?.monto_cert)
+  );
+  const [resultadoEval, setResultadoEval] = useState<string>(
+    () => filaExistente?.resultado_eval ?? ""
+  );
   const [motivoBucle, setMotivoBucle] = useState<string>("");
-  const [fechaEnvioOtpp, setFechaEnvioOtpp] = useState<string>("");
-  const [fechaRespOtpp, setFechaRespOtpp] = useState<string>("");
-  const [nroOcs, setNroOcs] = useState<string>("");
-  const [montoOcs, setMontoOcs] = useState<string>("");
-  const [plazoEntrega, setPlazoEntrega] = useState<string>("");
+  const [fechaEnvioOtpp, setFechaEnvioOtpp] = useState<string>(
+    () => filaExistente?.fecha_envio_otpp ?? ""
+  );
+  const [fechaRespOtpp, setFechaRespOtpp] = useState<string>(
+    () => filaExistente?.fecha_resp_otpp ?? ""
+  );
+  const [nroOcs, setNroOcs] = useState<string>(
+    () => filaExistente?.nro_ocs ?? ""
+  );
+  const [montoOcs, setMontoOcs] = useState<string>(
+    () => numOrEmpty(filaExistente?.monto_ocs)
+  );
+  const [plazoEntrega, setPlazoEntrega] = useState<string>(
+    () => numOrEmpty(filaExistente?.plazo_entrega)
+  );
 
   if (!open) return null;
 
@@ -132,12 +169,17 @@ export function ModalRegistroEtapa({
               procesoId={procesoId}
               filas={etapa.filas}
               areasUsuarias={areasUsuarias}
+              fechaInicioChain={fechaInicioSugerida}
             />
           ) : (
             <TablaAreasE24
               procesoId={procesoId}
               filas={etapa.filas}
               areasUsuarias={areasUsuarias}
+              fechaInicioChain={fechaInicioSugerida}
+              fechaLabel={etapa.cod === 'E01' ? 'Fecha de solicitud' : 'Fecha conformidad'}
+              codigoEtapa={etapa.cod}
+              nombreEtapa={etapa.nombre}
             />
           )}
         </div>
@@ -224,6 +266,7 @@ export function ModalRegistroEtapa({
                 type="date"
                 required
                 value={fechaInicio}
+                min={fechaInicioSugerida ?? undefined}
                 onChange={(e) => setFechaInicio(e.target.value)}
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 aria-required="true"
@@ -238,6 +281,7 @@ export function ModalRegistroEtapa({
                 id={`${etapa.cod}-fecha-fin`}
                 type="date"
                 value={fechaFin}
+                min={fechaInicio || fechaInicioSugerida || undefined}
                 onChange={(e) => setFechaFin(e.target.value)}
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
