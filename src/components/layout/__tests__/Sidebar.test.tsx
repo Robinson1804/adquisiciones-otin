@@ -63,10 +63,11 @@ describe("Sidebar", () => {
 
     expect(screen.getByRole("link", { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /procesos/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /tiempos/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /presupuesto/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /trazabilidad áreas/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /modo presentación/i })).toBeInTheDocument();
+    // Reportes section removed from nav (pages still exist, just not in sidebar)
+    expect(screen.queryByRole("link", { name: /tiempos/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /presupuesto/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /trazabilidad áreas/i })).not.toBeInTheDocument();
   });
 
   it("renders correct href for each nav link", () => {
@@ -74,9 +75,6 @@ describe("Sidebar", () => {
 
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: /procesos/i })).toHaveAttribute("href", "/procesos");
-    expect(screen.getByRole("link", { name: /tiempos/i })).toHaveAttribute("href", "/reportes/tiempos");
-    expect(screen.getByRole("link", { name: /presupuesto/i })).toHaveAttribute("href", "/reportes/presupuesto");
-    expect(screen.getByRole("link", { name: /trazabilidad áreas/i })).toHaveAttribute("href", "/reportes/areas");
     expect(screen.getByRole("link", { name: /modo presentación/i })).toHaveAttribute("href", "/presentacion");
   });
 
@@ -99,12 +97,15 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
   });
 
-  it("active link gets aria-current=page when pathname is a sub-route of /reportes/tiempos", () => {
+  it("no nav link is active when pathname is /reportes/tiempos (Reportes removed from nav)", () => {
     vi.mocked(usePathname).mockReturnValue("/reportes/tiempos");
     render(<Sidebar />);
 
-    expect(screen.getByRole("link", { name: /tiempos/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /presupuesto/i })).not.toHaveAttribute("aria-current");
+    // Reportes routes no longer have nav items — no link should be active
+    const links = screen.getAllByRole("link");
+    links.forEach((link) => {
+      expect(link).not.toHaveAttribute("aria-current", "page");
+    });
   });
 
   it("active link has distinct visual class indicating active state", () => {

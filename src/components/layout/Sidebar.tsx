@@ -33,14 +33,6 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    group: "Reportes",
-    items: [
-      { label: "Tiempos", href: "/reportes/tiempos" },
-      { label: "Presupuesto", href: "/reportes/presupuesto" },
-      { label: "Trazabilidad Áreas", href: "/reportes/areas" },
-    ],
-  },
-  {
     items: [
       { label: "Modo Presentación", href: "/presentacion" },
     ],

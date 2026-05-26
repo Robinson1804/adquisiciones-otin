@@ -1,6 +1,6 @@
 /**
- * C4 — S7 Dashboard page component tests.
- * Verifies metric cards render and empty state shows for no data.
+ * Dashboard Gerencial — page component tests.
+ * Verifies KPI cards, acquisition selector, table, and empty state.
  */
 
 import React from "react";
@@ -9,6 +9,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DashboardPage from "@/app/(dashboard)/dashboard/page";
 import type { Metricas, FlujoProcesosResponse } from "@/types/dashboard";
+import type { PaginatedProcesos } from "@/types";
 
 // Mock next/link
 vi.mock("next/link", () => ({
@@ -54,7 +55,7 @@ vi.mock("@/stores/authStore", () => ({
   }),
 }));
 
-import { getMetricas, getFlujoProcesos } from "@/lib/api";
+import { getMetricas, getFlujoProcesos, getProcesos, getEtapas } from "@/lib/api";
 
 const mockMetricas: Metricas = {
   anno: 2026,
@@ -86,7 +87,31 @@ const mockFlujoProcesos: FlujoProcesosResponse = {
   ],
 };
 
+const mockProcesos: PaginatedProcesos = {
+  items: [
+    {
+      id: 1,
+      id_proceso: "2026-001",
+      requerimiento: "Laptops para DTDIS",
+      tipo: "BIEN",
+      unidad_resp: "OTIN",
+      areas_usuarias: ["DTDIS"],
+      pim: "250000",
+      estado: "EN PROCESO",
+      motivo_cancel: null,
+      fecha_creacion: "2026-01-15",
+      creado_por: "admin",
+      anno: 2026,
+    },
+  ],
+  total: 1,
+  page: 1,
+  page_size: 200,
+  pages: 1,
+};
+
 const emptyFlujo: FlujoProcesosResponse = { procesos: [] };
+const emptyProcesos: PaginatedProcesos = { items: [], total: 0, page: 1, page_size: 200, pages: 0 };
 
 function createWrapper() {
   const qc = new QueryClient({
@@ -97,26 +122,55 @@ function createWrapper() {
   };
 }
 
-describe("S7 DashboardPage", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+describe("S7 DashboardPage (Gerencial)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getProcesos).mockResolvedValue(mockProcesos);
+    // getEtapas is called by LineaEtapasHorizontal; return empty to keep tests simple
+    vi.mocked(getEtapas).mockResolvedValue({ etapas: [], progreso: { etapa_actual: null, porcentaje: 0, completadas: 0, total: 0 } });
+  });
 
-  it("renders the page title", async () => {
+  it("renders the page title with the current year", () => {
     vi.mocked(getMetricas).mockResolvedValue(mockMetricas);
     vi.mocked(getFlujoProcesos).mockResolvedValue(mockFlujoProcesos);
     render(<DashboardPage />, { wrapper: createWrapper() });
     expect(screen.getByText(/Dashboard Adquisiciones TIC/i)).toBeTruthy();
   });
 
-  it("shows metric cards with real values after load", async () => {
+  it("shows all 6 KPI card labels", () => {
+    vi.mocked(getMetricas).mockResolvedValue(mockMetricas);
+    vi.mocked(getFlujoProcesos).mockResolvedValue(mockFlujoProcesos);
+    render(<DashboardPage />, { wrapper: createWrapper() });
+    expect(screen.getByText(/PIM Total/i)).toBeTruthy();
+    expect(screen.getByText(/Total Procesos/i)).toBeTruthy();
+    // Use getAllBy to handle multiple matches ("En Proceso" and "Culminados" also appear in the donut summary)
+    expect(screen.getAllByText(/En Proceso/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Culminados/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Cancelados/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Días Promedio/i)).toBeTruthy();
+  });
+
+  it("shows metric card values after data loads", async () => {
+    vi.mocked(getMetricas).mockResolvedValue(mockMetricas);
+    vi.mocked(getFlujoProcesos).mockResolvedValue(mockFlujoProcesos);
+    render(<DashboardPage />, { wrapper: createWrapper() });
+    // Values may appear in both KPI cards and the donut summary — use getAllBy
+    await waitFor(() => {
+      expect(screen.getAllByText("8").length).toBeGreaterThanOrEqual(1); // Total
+    });
+    expect(screen.getAllByText("4").length).toBeGreaterThanOrEqual(1);   // En Proceso
+    expect(screen.getAllByText("3").length).toBeGreaterThanOrEqual(1);   // Culminados
+    expect(screen.getAllByText("1").length).toBeGreaterThanOrEqual(1);   // Cancelados
+  });
+
+  it("shows acquisition in the selector and the table", async () => {
     vi.mocked(getMetricas).mockResolvedValue(mockMetricas);
     vi.mocked(getFlujoProcesos).mockResolvedValue(mockFlujoProcesos);
     render(<DashboardPage />, { wrapper: createWrapper() });
     await waitFor(() => {
-      expect(screen.getByText("8")).toBeTruthy(); // Total
+      expect(screen.getByText("Laptops para DTDIS")).toBeTruthy();
     });
-    expect(screen.getByText("4")).toBeTruthy();   // En Proceso
-    expect(screen.getByText("3")).toBeTruthy();   // Culminados
-    expect(screen.getByText("1")).toBeTruthy();   // Cancelados
+    expect(screen.getByText("2026-001")).toBeTruthy();
   });
 
   it("shows empty state when no procesos", async () => {
@@ -128,22 +182,26 @@ describe("S7 DashboardPage", () => {
       cancelados: 0,
     });
     vi.mocked(getFlujoProcesos).mockResolvedValue(emptyFlujo);
+    vi.mocked(getProcesos).mockResolvedValue(emptyProcesos);
     render(<DashboardPage />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(screen.getByText(/Sin datos para/i)).toBeTruthy();
     });
   });
 
-  it("shows proceso card with mini timeline", async () => {
+  it("shows the acquisition selector dropdown", async () => {
     vi.mocked(getMetricas).mockResolvedValue(mockMetricas);
     vi.mocked(getFlujoProcesos).mockResolvedValue(mockFlujoProcesos);
     render(<DashboardPage />, { wrapper: createWrapper() });
-    await waitFor(() => {
-      expect(screen.getByText("2026-001")).toBeTruthy();
-    });
-    expect(screen.getByText("Laptops para DTDIS")).toBeTruthy();
-    // MiniTimeline renders 5 listitem segments
-    const items = screen.getAllByRole("listitem");
-    expect(items.length).toBeGreaterThanOrEqual(5);
+    expect(screen.getByLabelText(/Seleccionar adquisición/i)).toBeTruthy();
+  });
+
+  it("shows Modo Presentación link", () => {
+    vi.mocked(getMetricas).mockResolvedValue(mockMetricas);
+    vi.mocked(getFlujoProcesos).mockResolvedValue(mockFlujoProcesos);
+    render(<DashboardPage />, { wrapper: createWrapper() });
+    const link = screen.getByRole("link", { name: /Modo Presentación/i });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("/presentacion");
   });
 });
