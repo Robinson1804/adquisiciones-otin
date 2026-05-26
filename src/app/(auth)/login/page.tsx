@@ -13,7 +13,7 @@ import React from "react";
  * Footer: soporte + "Oficina de Tecnologías de la Información — INEI".
  */
 
-import { useState, useId } from "react";
+import { useState, useId, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { api } from "@/lib/api";
@@ -137,6 +137,13 @@ export default function LoginPage() {
 
   const usernameId = useId();
   const passwordId = useId();
+
+  // Already authenticated → skip the login form and bounce to the app.
+  useEffect(() => {
+    if (document.cookie.includes("auth_token=")) {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
