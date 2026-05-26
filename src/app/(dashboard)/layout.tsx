@@ -2,13 +2,22 @@
 
 /**
  * (dashboard) group layout — client-side guard (defence-in-depth behind middleware)
- * + header with logged-in user info and logout button.
+ * + global navigation sidebar.
+ *
+ * CRITICAL invariants:
+ *  1. Zustand hydration guard: waits for hasHydrated() before redirecting.
+ *     Without it, authenticated users are bounced to /login on every hard reload.
+ *  2. ReactQueryProvider wraps children — all server-data hooks depend on it.
+ *  3. Sidebar is NOT rendered until hydration completes (avoids flash).
+ *  4. /presentacion uses fixed inset-0 z-50 — it covers the sidebar chrome;
+ *     no special case needed here.
  */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { ReactQueryProvider } from "@/lib/queryClient";
+import { Sidebar } from "@/components/layout/Sidebar";
 
 export default function DashboardLayout({
   children,
@@ -16,7 +25,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { token, user, logout } = useAuthStore();
+  const { token } = useAuthStore();
 
   // Zustand-persist rehydrates from localStorage on the client. On a hard page
   // load the first render has token=null until rehydration finishes, so we MUST
@@ -35,11 +44,6 @@ export default function DashboardLayout({
     }
   }, [hydrated, token, router]);
 
-  function handleLogout() {
-    logout();
-    router.push("/login");
-  }
-
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -53,31 +57,17 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      {/* Header */}
-      <header className="bg-primary text-white px-6 py-3 flex items-center justify-between shadow-card">
-        <span className="font-bold text-sm">Adquisiciones TIC — INEI</span>
-        <div className="flex items-center gap-4 text-sm">
-          {user && (
-            <span className="opacity-90">
-              {user.username}{" "}
-              <span className="text-xs opacity-70">({user.rol})</span>
-            </span>
-          )}
-          <button
-            onClick={handleLogout}
-            className="bg-white text-primary font-semibold px-3 py-1 rounded text-xs
-                       hover:bg-gray-100 transition-colors"
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-surface">
+      {/* Fixed 260px sidebar — occupies left column */}
+      <Sidebar />
 
-      {/* Page content — wrapped in ReactQueryProvider (client subtree safe) */}
-      <main className="flex-1 p-6">
-        <ReactQueryProvider>{children}</ReactQueryProvider>
-      </main>
+      {/* Main area — offset by sidebar width */}
+      <div className="pl-sidebar min-h-screen flex flex-col">
+        <main className="flex-1 p-6 max-w-screen-2xl">
+          {/* ReactQueryProvider (client subtree safe) */}
+          <ReactQueryProvider>{children}</ReactQueryProvider>
+        </main>
+      </div>
     </div>
   );
 }
