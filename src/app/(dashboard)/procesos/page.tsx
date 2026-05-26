@@ -10,6 +10,7 @@ import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { useProcesos } from "@/hooks/useProcesos";
+import { useMetricas } from "@/hooks/useDashboard";
 import { COLORES_ESTADO } from "@/lib/constants";
 import type { EstadoProceso, TipoProceso } from "@/types";
 
@@ -125,22 +126,19 @@ export default function ProcesosPage() {
 
   const { data, isLoading, isError } = useProcesos(filtros);
 
-  // Count queries for metric cards (page_size=1 → only need .total)
-  const { data: enProcesoData } = useProcesos({
-    estado: "EN PROCESO",
-    page_size: 1,
-    ...(anno ? { anno } : {}),
+  // C4: single /dashboard/metricas call replaces 3 count-queries for metric cards.
+  // When filter is "Todos" (anno=""), we show current-year metrics with a note.
+  const metricAnno = anno || CURRENT_YEAR;
+  const { data: metricas } = useMetricas(metricAnno);
+
+  const fmt = new Intl.NumberFormat("es-PE", {
+    style: "currency",
+    currency: "PEN",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
-  const { data: culminadoData } = useProcesos({
-    estado: "CULMINADO",
-    page_size: 1,
-    ...(anno ? { anno } : {}),
-  });
-  const { data: canceladoData } = useProcesos({
-    estado: "CANCELADO",
-    page_size: 1,
-    ...(anno ? { anno } : {}),
-  });
+  const pimStr = metricas?.pim_total != null ? fmt.format(metricas.pim_total) : "—";
+  const diasStr = metricas?.dias_promedio != null ? `${metricas.dias_promedio.toFixed(1)} d` : "—";
 
   // Pagination helpers
   const totalItems = data?.total ?? 0;
@@ -169,25 +167,21 @@ export default function ProcesosPage() {
         )}
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Metric cards — counts from list query; PIM/Días from /dashboard/metricas (C4) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <MetricCard label="Total Procesos" value={data?.total ?? "—"} />
-        <MetricCard
-          label="En Proceso"
-          value={enProcesoData?.total ?? "—"}
-        />
-        <MetricCard
-          label="Culminados"
-          value={culminadoData?.total ?? "—"}
-        />
-        <MetricCard
-          label="Cancelados"
-          value={canceladoData?.total ?? "—"}
-        />
+        <MetricCard label="En Proceso"     value={metricas?.en_proceso ?? "—"} />
+        <MetricCard label="Culminados"     value={metricas?.culminados ?? "—"} />
+        <MetricCard label="Cancelados"     value={metricas?.cancelados ?? "—"} />
         <MetricCard
           label="PIM Total"
-          value="—"
-          sub="Disponible en C4"
+          value={pimStr}
+          sub={!anno ? `(año ${CURRENT_YEAR})` : undefined}
+        />
+        <MetricCard
+          label="Días Promedio"
+          value={diasStr}
+          sub={!anno ? `(año ${CURRENT_YEAR})` : "culminados"}
         />
       </div>
 

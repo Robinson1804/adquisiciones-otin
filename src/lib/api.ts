@@ -15,6 +15,13 @@ import type {
   MontosProceso,
   ArchivoMeta,
 } from "@/types/etapa";
+import type {
+  Metricas,
+  FlujoProcesosResponse,
+  TiemposEtapaResponse,
+  PresupuestoResponse,
+  DemoraAreasResponse,
+} from "@/types/dashboard";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
@@ -194,4 +201,54 @@ export async function descargarArchivo(archivoId: number): Promise<Blob> {
 
 export async function eliminarArchivo(archivoId: number): Promise<void> {
   await api.delete(`/archivos/${archivoId}`);
+}
+
+// ============================================================
+// C4 — Dashboard API functions (read-only, require Bearer via interceptor)
+// All endpoints: prefix /dashboard, anno param required.
+// ============================================================
+
+export async function getMetricas(anno: number): Promise<Metricas> {
+  const res = await api.get<Metricas>("/dashboard/metricas", {
+    params: { anno },
+  });
+  return res.data;
+}
+
+export async function getFlujoProcesos(
+  anno: number
+): Promise<FlujoProcesosResponse> {
+  const res = await api.get<FlujoProcesosResponse>(
+    "/dashboard/flujo-procesos",
+    { params: { anno } }
+  );
+  return res.data;
+}
+
+export async function getTiemposEtapa(
+  anno: number
+): Promise<TiemposEtapaResponse> {
+  const res = await api.get<TiemposEtapaResponse>(
+    "/dashboard/tiempos-etapa",
+    { params: { anno } }
+  );
+  return res.data;
+}
+
+export async function getPresupuesto(
+  anno: number
+): Promise<PresupuestoResponse> {
+  const res = await api.get<PresupuestoResponse>("/dashboard/presupuesto", {
+    params: { anno },
+  });
+  return res.data;
+}
+
+export async function getDemoraAreas(
+  anno: number
+): Promise<DemoraAreasResponse> {
+  const res = await api.get<DemoraAreasResponse>("/dashboard/demora-areas", {
+    params: { anno },
+  });
+  return res.data;
 }

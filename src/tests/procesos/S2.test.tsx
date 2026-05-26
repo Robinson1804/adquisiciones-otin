@@ -12,6 +12,14 @@ vi.mock("@/hooks/useProcesos", () => ({
   useProcesos: vi.fn(),
 }));
 
+vi.mock("@/hooks/useDashboard", () => ({
+  useMetricas: vi.fn().mockReturnValue({
+    data: null,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn(),
 }));
@@ -105,7 +113,8 @@ describe("S2 — ProcesosPage", () => {
     expect(screen.getByText(/Total Procesos/i)).toBeInTheDocument();
     // "En Proceso" appears in card label and filter option — use getAllByText
     expect(screen.getAllByText(/En Proceso/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Culminados/i)).toBeInTheDocument();
+    // "Culminados" card label + "culminados" sub-text in Días Promedio card — use getAllByText
+    expect(screen.getAllByText(/Culminados/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Cancelados/i)).toBeInTheDocument();
     expect(screen.getByText(/PIM Total/i)).toBeInTheDocument();
   });
