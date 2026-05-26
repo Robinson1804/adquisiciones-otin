@@ -252,3 +252,26 @@ export async function getDemoraAreas(
   });
   return res.data;
 }
+
+// ============================================================
+// C5 — Export API functions (blob downloads, Bearer via interceptor)
+//
+// Pattern mirrors descargarArchivo (C3c): responseType:'blob' so axios
+// returns a Blob directly. The interceptor adds the Bearer token.
+// The caller is responsible for triggering the download (objectURL + <a>).
+// ============================================================
+
+export async function exportExcel(anno: number): Promise<Blob> {
+  const res = await api.get<Blob>("/export/excel", {
+    params: { anno },
+    responseType: "blob",
+  });
+  return res.data;
+}
+
+export async function exportProcesoPdf(id: number): Promise<Blob> {
+  const res = await api.get<Blob>(`/export/proceso/${id}/pdf`, {
+    responseType: "blob",
+  });
+  return res.data;
+}

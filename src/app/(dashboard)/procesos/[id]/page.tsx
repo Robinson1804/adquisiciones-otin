@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { useProceso, useActualizarProceso } from "@/hooks/useProcesos";
 import { useMontosProceso } from "@/hooks/useMontosProceso";
+import { useExportProcesoPdf } from "@/hooks/useExport";
 import { LineaTiempo } from "@/components/procesos/LineaTiempo";
 import { COLORES_ESTADO, COLORES_ACTOR } from "@/lib/constants";
 import type { EstadoProceso } from "@/types";
@@ -88,6 +89,13 @@ export default function DetalleProceso() {
   const { mutate: actualizarProceso, isPending: isUpdating } =
     useActualizarProceso();
 
+  // C5 — PDF export
+  const {
+    trigger: downloadPdf,
+    isLoading: isExportingPdf,
+    error: pdfExportError,
+  } = useExportProcesoPdf();
+
   // Simple inline edit state
   const [editMode, setEditMode] = useState(false);
   const [editReq, setEditReq] = useState("");
@@ -155,24 +163,42 @@ export default function DetalleProceso() {
       </nav>
 
       {/* Title row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-primary font-mono">
             {proceso.id_proceso}
           </h1>
           <EstadoBadge estado={proceso.estado} />
         </div>
-        {puedeEscribir && !editMode && (
+        <div className="flex items-center gap-2">
+          {/* C5 — PDF export: available to all authenticated roles */}
           <button
-            onClick={handleEdit}
-            className="px-4 py-1.5 bg-white border border-outline rounded text-sm text-gray-700
-                       hover:bg-surface-content transition-colors"
-            aria-label="Editar proceso"
+            onClick={() => void downloadPdf(proceso.id, proceso.id_proceso)}
+            disabled={isExportingPdf}
+            className="border border-outline text-primary font-semibold px-4 py-1.5 rounded text-sm
+                       hover:bg-surface-content transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={`Exportar proceso ${proceso.id_proceso} a PDF`}
           >
-            Editar
+            {isExportingPdf ? "Exportando..." : "Exportar PDF"}
           </button>
-        )}
+          {puedeEscribir && !editMode && (
+            <button
+              onClick={handleEdit}
+              className="px-4 py-1.5 bg-white border border-outline rounded text-sm text-gray-700
+                         hover:bg-surface-content transition-colors"
+              aria-label="Editar proceso"
+            >
+              Editar
+            </button>
+          )}
+        </div>
       </div>
+      {/* C5 — PDF export error feedback */}
+      {pdfExportError && (
+        <p className="text-sm text-red-600" role="alert">
+          {pdfExportError}
+        </p>
+      )}
 
       {/* Main 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

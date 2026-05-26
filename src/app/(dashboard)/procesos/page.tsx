@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { useProcesos } from "@/hooks/useProcesos";
 import { useMetricas } from "@/hooks/useDashboard";
+import { useExportExcel } from "@/hooks/useExport";
 import { COLORES_ESTADO } from "@/lib/constants";
 import type { EstadoProceso, TipoProceso } from "@/types";
 
@@ -102,6 +103,10 @@ export default function ProcesosPage() {
   const puedeEscribir =
     user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
+  // C5 — Excel export
+  const { trigger: downloadExcel, isLoading: isExporting, error: exportError } =
+    useExportExcel();
+
   // Filters
   const [searchInput, setSearchInput] = useState("");
   const [estado, setEstado] = useState<EstadoProceso | "">("");
@@ -151,21 +156,39 @@ export default function ProcesosPage() {
   return (
     <div className="space-y-6">
       {/* Page title */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-xl font-bold text-primary">
           Adquisiciones TIC {anno || ""}
         </h1>
-        {puedeEscribir && (
-          <Link
-            href="/procesos/nuevo"
-            className="bg-primary text-white font-semibold px-4 py-2 rounded text-sm
-                       hover:bg-primary-container transition-colors"
-            aria-label="Crear nuevo proceso de adquisición"
+        <div className="flex items-center gap-2">
+          {/* C5 — Excel export: available to all authenticated roles */}
+          <button
+            onClick={() => void downloadExcel(anno || CURRENT_YEAR)}
+            disabled={isExporting}
+            className="border border-outline text-primary font-semibold px-4 py-2 rounded text-sm
+                       hover:bg-surface-content transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Exportar procesos a Excel"
           >
-            + Nuevo Proceso
-          </Link>
-        )}
+            {isExporting ? "Exportando..." : "Exportar Excel"}
+          </button>
+          {puedeEscribir && (
+            <Link
+              href="/procesos/nuevo"
+              className="bg-primary text-white font-semibold px-4 py-2 rounded text-sm
+                         hover:bg-primary-container transition-colors"
+              aria-label="Crear nuevo proceso de adquisición"
+            >
+              + Nuevo Proceso
+            </Link>
+          )}
+        </div>
       </div>
+      {/* C5 — Export error feedback */}
+      {exportError && (
+        <p className="text-sm text-red-600" role="alert">
+          {exportError}
+        </p>
+      )}
 
       {/* Metric cards — counts from list query; PIM/Días from /dashboard/metricas (C4) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
