@@ -33,6 +33,15 @@ interface RowState {
   editing: boolean;
 }
 
+// Estado badge label helper (mirrors EtapaCard.EstadoBadge)
+function estadoLabel(estado: string): string {
+  if (estado === 'NO_APLICA') return 'No aplica';
+  if (estado === 'EN_CURSO') return 'En Curso';
+  if (estado === 'COMPLETADO') return 'Completado';
+  if (estado === 'PENDIENTE') return 'Pendiente';
+  return estado;
+}
+
 export function TablaAreasE11({
   procesoId,
   filas,
@@ -108,6 +117,26 @@ export function TablaAreasE11({
     }
   }
 
+  function handleNoAplica(area: string) {
+    const existingFila = filas.find((f) => f.area_usuaria === area);
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    if (existingFila) {
+      actualizar({
+        etapaId: existingFila.id,
+        payload: { estado_etapa: 'NO_APLICA', fecha_inicio: existingFila.fecha_inicio ?? hoy },
+      });
+    } else {
+      registrar({
+        codigo_etapa: 'E11',
+        nombre_etapa: 'Solicitud cert. presupuestal (cada Area - OTIN)',
+        fecha_inicio: hoy,
+        estado_etapa: 'NO_APLICA',
+        area_usuaria: area,
+      });
+    }
+  }
+
   // Running total from existing filas + local edits that have values
   const runningTotal = areasUsuarias.reduce((acc, area) => {
     const montoCert = rowState[area]?.montoCert ?? '';
@@ -136,8 +165,14 @@ export function TablaAreasE11({
               const fila = filas.find((f) => f.area_usuaria === area);
               const row: RowState = rowState[area] ?? { montoCert: '', fecha: '', editing: false };
               const estado = fila?.estado_etapa ?? 'PENDIENTE';
-              const estadoKey = (estado === 'EN_CURSO' ? 'EN_CURSO' : estado === 'COMPLETADO' ? 'COMPLETADO' : 'PENDIENTE') as keyof typeof COLORES_ESTADO;
+              const estadoKey = (
+                estado === 'EN_CURSO' ? 'EN_CURSO' :
+                estado === 'COMPLETADO' ? 'COMPLETADO' :
+                estado === 'NO_APLICA' ? 'NO_APLICA' :
+                'PENDIENTE'
+              ) as keyof typeof COLORES_ESTADO;
               const estadoColor = COLORES_ESTADO[estadoKey];
+              const esNoAplica = estado === 'NO_APLICA';
               const diasDemora = getDiasDemoraArea(
                 fila?.fecha_inicio ?? null,
                 fechaInicioChain
@@ -176,7 +211,7 @@ export function TablaAreasE11({
                       className="text-xs px-2 py-0.5 rounded-lg font-medium"
                       style={{ backgroundColor: estadoColor.bg, color: estadoColor.text }}
                     >
-                      {estado}
+                      {estadoLabel(estado)}
                     </span>
                   </td>
 
@@ -218,16 +253,42 @@ export function TablaAreasE11({
                           Cancelar
                         </button>
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(area, true)}
-                        className="text-xs px-2 py-0.5 rounded border border-blue-300 text-blue-700 hover:bg-blue-50"
-                        aria-label={fila ? `Editar ${area}` : `Registrar ${area}`}
-                      >
-                        {fila ? 'Editar' : 'Registrar'}
-                      </button>
-                    )}
+                    ) : canEdit ? (
+                      <div className="flex gap-1">
+                        {!esNoAplica && (
+                          <button
+                            type="button"
+                            onClick={() => setEditing(area, true)}
+                            className="text-xs px-2 py-0.5 rounded border border-blue-300 text-blue-700 hover:bg-blue-50"
+                            aria-label={fila ? `Editar ${area}` : `Registrar ${area}`}
+                          >
+                            {fila ? 'Editar' : 'Registrar'}
+                          </button>
+                        )}
+                        {/* BUG-5: "No aplica" action — available when area is PENDIENTE or to
+                            allow re-toggling from NO_APLICA back (shows as "Reactivar") */}
+                        {!esNoAplica ? (
+                          <button
+                            type="button"
+                            onClick={() => handleNoAplica(area)}
+                            disabled={isSaving}
+                            className="text-xs px-2 py-0.5 rounded border border-slate-400 text-slate-600 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+                            aria-label={`Marcar ${area} como No aplica en E11`}
+                          >
+                            No aplica
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEditing(area, true)}
+                            className="text-xs px-2 py-0.5 rounded border border-orange-300 text-orange-700 hover:bg-orange-50"
+                            aria-label={`Editar ${area} en E11`}
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
                 {/* C3c — Adjuntos expansion row per area (E11 is a key stage) */}

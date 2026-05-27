@@ -33,6 +33,7 @@ interface TablaAreasE24Props {
 
 interface RowState {
   fecha: string;
+  cmn: string;
   editing: boolean;
 }
 
@@ -50,12 +51,15 @@ export function TablaAreasE24({
   const { user } = useAuthStore();
   const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
+  const isE01 = codigoEtapa === "E01";
+
   const [rowState, setRowState] = useState<Record<string, RowState>>(() => {
     const state: Record<string, RowState> = {};
     for (const area of areasUsuarias) {
       const fila = filas.find((f) => f.area_usuaria === area);
       state[area] = {
         fecha: fila?.fecha_inicio ?? '',
+        cmn: fila?.cmn_adjunto ?? 'NO',
         editing: false,
       };
     }
@@ -64,15 +68,22 @@ export function TablaAreasE24({
 
   function setEditing(area: string, editing: boolean) {
     setRowState((prev) => {
-      const current = prev[area] ?? { fecha: '', editing: false };
+      const current = prev[area] ?? { fecha: '', cmn: 'NO', editing: false };
       return { ...prev, [area]: { ...current, editing } satisfies RowState };
     });
   }
 
   function updateFecha(area: string, value: string) {
     setRowState((prev) => {
-      const current = prev[area] ?? { fecha: '', editing: false };
+      const current = prev[area] ?? { fecha: '', cmn: 'NO', editing: false };
       return { ...prev, [area]: { ...current, fecha: value } satisfies RowState };
+    });
+  }
+
+  function updateCmn(area: string, value: string) {
+    setRowState((prev) => {
+      const current = prev[area] ?? { fecha: '', cmn: 'NO', editing: false };
+      return { ...prev, [area]: { ...current, cmn: value } satisfies RowState };
     });
   }
 
@@ -81,6 +92,8 @@ export function TablaAreasE24({
     const fecha = rowState[area]?.fecha ?? '';
     if (!fecha) return;
 
+    const cmn = rowState[area]?.cmn ?? 'NO';
+
     if (existingFila) {
       actualizar(
         {
@@ -88,6 +101,7 @@ export function TablaAreasE24({
           payload: {
             fecha_inicio: fecha,
             estado_etapa: 'COMPLETADO',
+            ...(isE01 ? { cmn_adjunto: cmn } : {}),
           },
         },
         { onSuccess: () => setEditing(area, false) }
@@ -100,6 +114,7 @@ export function TablaAreasE24({
           fecha_inicio: fecha,
           estado_etapa: 'COMPLETADO',
           area_usuaria: area,
+          ...(isE01 ? { cmn_adjunto: cmn } : {}),
         },
         { onSuccess: () => setEditing(area, false) }
       );
@@ -118,13 +133,16 @@ export function TablaAreasE24({
               <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600">{fechaLabel}</th>
               <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">Dias demora</th>
               <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">Estado</th>
+              {isE01 && (
+                <th className="text-center py-2 px-3 text-xs font-semibold text-gray-600">CMN</th>
+              )}
               <th className="py-2 px-3 text-xs font-semibold text-gray-600">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {areasUsuarias.map((area) => {
               const fila = filas.find((f) => f.area_usuaria === area);
-              const row: RowState = rowState[area] ?? { fecha: '', editing: false };
+              const row: RowState = rowState[area] ?? { fecha: '', cmn: 'NO', editing: false };
               const estado = fila?.estado_etapa ?? 'PENDIENTE';
               const estadoKey = (estado === 'COMPLETADO' ? 'COMPLETADO' : estado === 'EN_CURSO' ? 'EN_CURSO' : 'PENDIENTE') as keyof typeof COLORES_ESTADO;
               const estadoColor = COLORES_ESTADO[estadoKey];
@@ -169,6 +187,25 @@ export function TablaAreasE24({
                     </span>
                   </td>
 
+                  {isE01 && (
+                    <td className="py-2 px-3 text-center">
+                      {row.editing ? (
+                        <select
+                          value={row.cmn}
+                          onChange={(e) => updateCmn(area, e.target.value)}
+                          aria-label={`CMN para ${area}`}
+                          className="border border-gray-300 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        >
+                          <option value="SI">SI</option>
+                          <option value="NO">NO</option>
+                          <option value="PENDIENTE">PENDIENTE</option>
+                        </select>
+                      ) : (
+                        <span>{fila?.cmn_adjunto ?? '—'}</span>
+                      )}
+                    </td>
+                  )}
+
                   <td className="py-2 px-3">
                     {row.editing ? (
                       <div className="flex gap-1">
@@ -202,7 +239,7 @@ export function TablaAreasE24({
                 </tr>
                 {/* C3c — Adjuntos expansion row per area (E24 is a key stage) */}
                 <tr className="bg-gray-50">
-                  <td colSpan={5} className="pb-2 px-3">
+                  <td colSpan={isE01 ? 6 : 5} className="pb-2 px-3">
                     <AdjuntosEtapa
                       etapaId={fila?.id ?? 0}
                       canEdit={canEdit}

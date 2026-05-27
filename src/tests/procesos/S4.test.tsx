@@ -16,6 +16,7 @@ vi.mock("@/stores/authStore", () => ({
 vi.mock("@/hooks/useProcesos", () => ({
   useProceso: vi.fn(),
   useActualizarProceso: vi.fn(),
+  useEliminarProceso: vi.fn(),
 }));
 
 // C3b: mock useMontosProceso so S4 tests don't need a real backend
@@ -48,7 +49,7 @@ vi.mock("next/link", () => ({
 }));
 
 import { useAuthStore } from "@/stores/authStore";
-import { useProceso, useActualizarProceso } from "@/hooks/useProcesos";
+import { useProceso, useActualizarProceso, useEliminarProceso } from "@/hooks/useProcesos";
 import DetalleProceso from "@/app/(dashboard)/procesos/[id]/page";
 import type { Proceso } from "@/types";
 
@@ -102,6 +103,25 @@ describe("S4 — DetalleProceso", () => {
       submittedAt: 0,
       mutateAsync: vi.fn(),
     } as ReturnType<typeof useActualizarProceso>);
+
+    vi.mocked(useEliminarProceso).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      error: null,
+      data: undefined,
+      isSuccess: false,
+      isError: false,
+      isIdle: true,
+      reset: vi.fn(),
+      status: "idle",
+      variables: undefined,
+      context: undefined,
+      failureCount: 0,
+      failureReason: null,
+      isPaused: false,
+      submittedAt: 0,
+      mutateAsync: vi.fn(),
+    } as ReturnType<typeof useEliminarProceso>);
   });
 
   it("renders proceso ficha fields from useProceso data", () => {

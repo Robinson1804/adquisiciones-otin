@@ -14,19 +14,23 @@ export const COLORES_ACTOR = {
 
 // ============================================================
 // COLORES POR ESTADO — fuente canónica: CONTEXT.md §7
+// bg/text: pill de estado · bar: barra izquierda de la tarjeta
+// Paleta reforzada para que Completado/En Curso/Pendiente
+// se distingan claramente con fondo de tarjeta neutro (blanco).
 // ============================================================
 export const COLORES_ESTADO = {
-  COMPLETADO: { bg: '#C6EFCE', text: '#276221' },
-  EN_CURSO:   { bg: '#DDEBF7', text: '#1F3864' },
-  PENDIENTE:  { bg: '#FFEB9C', text: '#9C5700' },
-  CANCELADO:  { bg: '#FFCDD2', text: '#B71C1C' },
-  OMITIDO:    { bg: '#E0E0E0', text: '#616161' },
+  COMPLETADO: { bg: '#DCFCE7', text: '#15803D', bar: '#16A34A' },
+  EN_CURSO:   { bg: '#DBEAFE', text: '#1D4ED8', bar: '#2563EB' },
+  PENDIENTE:  { bg: '#FEF3C7', text: '#B45309', bar: '#D97706' },
+  CANCELADO:  { bg: '#FEE2E2', text: '#B91C1C', bar: '#DC2626' },
+  OMITIDO:    { bg: '#F1F5F9', text: '#64748B', bar: '#94A3B8' },
+  NO_APLICA:  { bg: '#F1F5F9', text: '#64748B', bar: '#94A3B8' },
 } as const;
 
 // ============================================================
 // CATÁLOGO COMPLETO DE ETAPAS — fuente canónica: CONTEXT.md §8
-// 27 entradas: E01–E25 incluyendo E08a y E08b
-// C3c: acepta_adjuntos field mirrors backend CODIGOS_CON_ADJUNTOS (12 key stages).
+// 28 entradas: E01–E25 incluyendo E06b, E08a y E08b
+// C3c: acepta_adjuntos field mirrors backend CODIGOS_CON_ADJUNTOS (17 key stages).
 // ============================================================
 export const ETAPAS_CONFIG = [
   { cod: 'E01',  area: 'AREAS',       nombre: 'Solicitud de requerimiento TIC (Áreas → OTIN)',
@@ -50,7 +54,13 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E06',  area: 'BUCLE',       nombre: 'Corrección TDR [BUCLE] (OTIN → OEAS)',
     instruccion: 'OTIN corrige y reenvía. Registrar corrección + N° ronda.',
-    es_bucle: true as const, campos_extra: ['motivo_bucle', 'nro_ronda'] },
+    es_bucle: true as const, campos_extra: ['motivo_bucle', 'nro_ronda'],
+    acepta_adjuntos: true as const },
+
+  { cod: 'E06b', area: 'BUCLE',       nombre: 'Solicitud V°B° DTDIS (OTIN → DTDIS)',
+    instruccion: 'OTIN solicita V°B° a DTDIS. Registrar motivo + N° ronda.',
+    es_bucle: true as const, campos_extra: ['motivo_bucle', 'nro_ronda'],
+    acepta_adjuntos: true as const },
 
   { cod: 'E07',  area: 'OEAS',        nombre: 'Evaluación técnica (OEAS → OTIN)',
     instruccion: 'OEAS verifica que proveedores cumplen TDR.',
@@ -58,7 +68,7 @@ export const ETAPAS_CONFIG = [
 
   { cod: 'E08',  area: 'OTIN',        nombre: 'Respuesta OTIN a evaluación técnica (OTIN → OEAS)',
     instruccion: 'APROBADO → avanza E09. CON OBSERVACIONES → bucle E08a/E08b.',
-    campos_extra: ['resultado_eval'] },
+    campos_extra: ['resultado_eval'], acepta_adjuntos: true as const },
 
   { cod: 'E08a', area: 'BUCLE',       nombre: 'Observaciones al proveedor [BUCLE] (OEAS → Prov.)',
     instruccion: 'OEAS comunica observaciones al proveedor.',
@@ -109,13 +119,13 @@ export const ETAPAS_CONFIG = [
     campos_extra: ['nro_ocs', 'monto_ocs', 'plazo_entrega'], acepta_adjuntos: true as const },
 
   { cod: 'E20',  area: 'OEAS',        nombre: 'Notificación al proveedor (OEAS → Proveedor)',
-    instruccion: 'Registrar fecha de notificación.' },
+    instruccion: 'Registrar fecha de notificación.', acepta_adjuntos: true as const },
 
   { cod: 'E21',  area: 'PROVEEDOR',   nombre: 'Confirmación recepción OCS (Proveedor→OEAS→OTIN)',
     instruccion: 'Desde aquí corre el servicio/bien.' },
 
   { cod: 'E22',  area: 'PROVEEDOR',   nombre: 'Inicio de servicio / entrega del bien',
-    instruccion: 'Registrar FECHA REAL DE INICIO.' },
+    instruccion: 'Registrar FECHA REAL DE INICIO.', acepta_adjuntos: true as const },
 
   { cod: 'E23',  area: 'OTIN',        nombre: 'OTIN solicita conformidad (OTIN → Áreas)',
     instruccion: 'Notificar a cada área que emita conformidad.' },
@@ -133,8 +143,8 @@ export const ETAPAS_CONFIG = [
 // ============================================================
 // C3c — Set of stage codes that accept file attachments.
 // Mirrors backend CODIGOS_CON_ADJUNTOS (frozenset).
-// Test-sync: both sets must contain exactly these 12 codes.
+// Test-sync: both sets must contain exactly these 17 codes.
 // ============================================================
 export const CODIGOS_CON_ADJUNTOS = new Set<string>([
-  'E01', 'E02', 'E03', 'E07', 'E09', 'E11', 'E13', 'E14', 'E15', 'E16', 'E19', 'E24',
+  'E01', 'E02', 'E03', 'E06', 'E06b', 'E07', 'E08', 'E09', 'E11', 'E13', 'E14', 'E15', 'E16', 'E19', 'E20', 'E22', 'E24',
 ]);

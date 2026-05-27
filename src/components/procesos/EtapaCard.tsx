@@ -3,17 +3,22 @@
 /**
  * EtapaCard — renders a single etapa in the timeline.
  *
- * - Border/bg from COLORES_ACTOR[area_responsable]
- * - Dashed border for BUCLE stages (Spec §H)
- * - Estado badge from COLORES_ESTADO
- * - "Registrar avance" button visible to EDITOR/ADMIN only
- * - Prerequisite not met → button disabled + tooltip (UI-only defense; C3b enforces on backend)
- * - E16: red alert badge when alerta_otpp = true
- * - E21: indicator "Inicio del plazo del servicio/bien" when COMPLETADO
+ * Layout (redesign):
+ *  - Fondo NEUTRO (blanco, borde gris suave). NO se pinta el fondo por actor.
+ *  - Barra de color izquierda (~4 px) + pill de estado = señal principal de ESTADO.
+ *  - Chip de actor chico con el color del ACTOR (solo ese chip, no toda la tarjeta).
+ *  - Panel expandible (chevron) con observaciones, oficio/correo y AdjuntosEtapa.
+ *
+ * Funcionalidad preservada íntegramente:
+ *  - Botón Registrar / Editar / Bloqueado según actionability.
+ *  - Botón rápido "No aplica" (EDITOR/ADMIN, PENDIENTE no-bucle no-por_area).
+ *  - Bucles: RondasList con "Agregar ronda" + badge de ronda.
+ *  - "Reiniciar TDR" (E10 CANCELADO por SIN_PRESUPUESTO).
+ *  - AlertaE16 y el indicador de E21.
  */
 
 import React from "react";
-import { COLORES_ACTOR, COLORES_ESTADO } from "@/lib/constants";
+import { COLORES_ACTOR, COLORES_ESTADO, CODIGOS_CON_ADJUNTOS } from "@/lib/constants";
 import { useAuthStore } from "@/stores/authStore";
 import type { EtapaAgrupada } from "@/types/etapa";
 import type { EtapaActionability } from "@/lib/etapaRules";
@@ -21,7 +26,56 @@ import { getLatestRonda } from "@/lib/etapaRules";
 import { formatFechaCorta } from "@/lib/fecha";
 import { AlertaE16 } from "./AlertaE16";
 import { RondasList } from "./RondasList";
-import { useReiniciarTdr } from "@/hooks/useEtapas";
+import { AdjuntosEtapa } from "./AdjuntosEtapa";
+import { useReiniciarTdr, useRegistrarEtapa } from "@/hooks/useEtapas";
+
+// ----------------------------------------------------------------
+// Sub-components
+// ----------------------------------------------------------------
+
+function EstadoPill({ estado }: { estado: string }) {
+  const key = estado as keyof typeof COLORES_ESTADO;
+  const color = COLORES_ESTADO[key] ?? COLORES_ESTADO.PENDIENTE;
+  const label =
+    estado === 'EN_CURSO'   ? 'En Curso' :
+    estado === 'COMPLETADO' ? 'Completado' :
+    estado === 'PENDIENTE'  ? 'Pendiente' :
+    estado === 'OMITIDO'    ? 'Omitido' :
+    estado === 'NO_APLICA'  ? 'No aplica' :
+    estado;
+  return (
+    <span
+      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{ backgroundColor: color.bg, color: color.text }}
+      aria-label={`Estado: ${label}`}
+      data-testid="estado-pill"
+    >
+      {label}
+    </span>
+  );
+}
+
+function ActorChip({ actor }: { actor: string }) {
+  const key = actor as keyof typeof COLORES_ACTOR;
+  const color = COLORES_ACTOR[key] ?? COLORES_ACTOR.OTIN;
+  return (
+    <span
+      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap border"
+      style={{
+        backgroundColor: color.bg,
+        color: color.text,
+        borderColor: color.border,
+      }}
+      data-testid="actor-chip"
+    >
+      {actor}
+    </span>
+  );
+}
+
+// ----------------------------------------------------------------
+// Main component
+// ----------------------------------------------------------------
 
 interface EtapaCardProps {
   etapa: EtapaAgrupada;
@@ -30,26 +84,6 @@ interface EtapaCardProps {
   procesoEstado?: string;
   actionability: EtapaActionability;
   onRegistrar: () => void;
-}
-
-function EstadoBadge({ estado }: { estado: string }) {
-  const key = estado as keyof typeof COLORES_ESTADO;
-  const color = COLORES_ESTADO[key] ?? COLORES_ESTADO.PENDIENTE;
-  const label =
-    estado === 'EN_CURSO' ? 'En Curso' :
-    estado === 'COMPLETADO' ? 'Completado' :
-    estado === 'PENDIENTE' ? 'Pendiente' :
-    estado === 'OMITIDO' ? 'Omitido' :
-    estado;
-  return (
-    <span
-      className="text-xs font-medium px-2 py-0.5 rounded-lg whitespace-nowrap"
-      style={{ backgroundColor: color.bg, color: color.text }}
-      aria-label={`Estado: ${label}`}
-    >
-      {label}
-    </span>
-  );
 }
 
 export function EtapaCard({
@@ -63,7 +97,10 @@ export function EtapaCard({
   const { user } = useAuthStore();
   const puedeEscribir = user?.rol === 'ADMIN' || user?.rol === 'EDITOR';
 
-  // WU-F3: Reiniciar TDR — only shown on E10 card when proceso is CANCELADO due to SIN_PRESUPUESTO
+  // Expand/collapse state for the detail panel
+  const [expanded, setExpanded] = React.useState(false);
+
+  // WU-F3: Reiniciar TDR
   const reiniciarMutation = useReiniciarTdr(procesoId);
   const esCanceladoPorSinPresupuesto =
     etapa.cod === 'E10' &&
@@ -71,30 +108,63 @@ export function EtapaCard({
     etapa.filas.some((f) => f.resultado_eval === 'SIN_PRESUPUESTO');
   const [reiniciarError, setReiniciarError] = React.useState<string | null>(null);
 
-  // Actor colors from constants — fallback to OTIN if unknown actor key
-  const actorKey = etapa.area_responsable as keyof typeof COLORES_ACTOR;
-  const actorColor = COLORES_ACTOR[actorKey] ?? COLORES_ACTOR.OTIN;
   const isBucle = etapa.es_bucle;
   const latestRonda = getLatestRonda(etapa);
 
-  // Border style: dashed for BUCLE stages
-  const borderStyle: React.CSSProperties = {
-    backgroundColor: actorColor.bg,
-    borderColor: actorColor.border,
-    borderStyle: isBucle ? 'dashed' : 'solid',
-    borderWidth: '1px',
-  };
+  // NO_APLICA quick-action
+  const noAplicaMutation = useRegistrarEtapa(procesoId);
+  const [noAplicaError, setNoAplicaError] = React.useState<string | null>(null);
+  const puedeMarcarNoAplica =
+    puedeEscribir &&
+    !isBucle &&
+    !etapa.por_area &&
+    etapa.estado === 'PENDIENTE';
 
-  // Determine display date info from first fila (simple stages)
+  function handleNoAplica() {
+    setNoAplicaError(null);
+    const hoy = new Date().toISOString().slice(0, 10);
+    noAplicaMutation.mutate(
+      {
+        codigo_etapa: etapa.cod,
+        nombre_etapa: etapa.nombre,
+        fecha_inicio: hoy,
+        estado_etapa: 'NO_APLICA',
+      },
+      {
+        onError: (err) => {
+          const msg = (err as { response?: { data?: { detail?: string } } })
+            ?.response?.data?.detail;
+          setNoAplicaError(msg ?? 'No se pudo marcar como No aplica');
+        },
+      }
+    );
+  }
+
+  // Estado colors
+  const estadoKey = etapa.estado as keyof typeof COLORES_ESTADO;
+  const estadoColor = COLORES_ESTADO[estadoKey] ?? COLORES_ESTADO.PENDIENTE;
+
+  // Date info from first fila
   const primeraFila = etapa.filas[0] ?? null;
   const fechaInicio = primeraFila?.fecha_inicio ?? null;
   const fechaFin = primeraFila?.fecha_fin ?? null;
   const dias = primeraFila?.dias ?? null;
+  const responsable = primeraFila?.responsable ?? null;
+  const observaciones = primeraFila?.observaciones ?? null;
+  const oficioCorreo = primeraFila?.oficio_correo ?? null;
 
-  // Action button label: a stage that already has progress shows "Editar"
-  // (open to review/edit); a fresh registrable stage shows "Registrar".
+  // etapaId for AdjuntosEtapa (0 means no row yet)
+  const etapaId = primeraFila?.id ?? 0;
+  const aceptaAdjuntos = CODIGOS_CON_ADJUNTOS.has(etapa.cod);
+
+  // Has any detail to show in the expanded panel
+  const tieneDetalle = !!observaciones || !!oficioCorreo || aceptaAdjuntos;
+
+  // Action button
   const yaRegistrada =
-    etapa.estado === 'COMPLETADO' || etapa.estado === 'EN_CURSO';
+    etapa.estado === 'COMPLETADO' ||
+    etapa.estado === 'EN_CURSO' ||
+    etapa.estado === 'NO_APLICA';
   const accionLabel = !actionability.canRegister
     ? 'Bloqueado'
     : yaRegistrada
@@ -106,152 +176,247 @@ export function EtapaCard({
       ? `Editar etapa ${etapa.cod}`
       : `Registrar avance de ${etapa.cod}`;
 
+  // Card border style: dashed for BUCLE stages
+  const cardBorderStyle: React.CSSProperties = {
+    borderLeftWidth: '4px',
+    borderLeftColor: estadoColor.bar,
+    borderLeftStyle: isBucle ? 'dashed' : 'solid',
+  };
+
   return (
     <article
-      className="rounded-lg p-3 relative"
-      style={borderStyle}
+      className="bg-white rounded-lg border border-gray-200 relative overflow-hidden"
+      style={cardBorderStyle}
       aria-label={`Etapa ${etapa.cod}: ${etapa.nombre}`}
       data-testid={`etapa-card-${etapa.cod}`}
     >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-1 min-w-0 flex-1">
-          {/* Code + name */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span
-              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
-              style={{ backgroundColor: actorColor.border, color: actorColor.text }}
-            >
-              {etapa.cod}
-            </span>
-            <span
-              className="text-xs font-semibold truncate"
-              style={{ color: actorColor.text }}
-            >
-              {etapa.nombre}
-            </span>
-          </div>
+      {/* Main content area */}
+      <div className="p-3">
 
-          {/* Estado badge + ronda badge */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <EstadoBadge estado={etapa.estado} />
-            {isBucle && latestRonda !== null && (
-              <span
-                className="text-xs px-2 py-0.5 rounded-lg font-medium"
-                style={{ backgroundColor: COLORES_ACTOR.BUCLE.bg, color: COLORES_ACTOR.BUCLE.text }}
-              >
-                Ronda {latestRonda}
+        {/* Header row: actor chip · code · name · (expand btn) · state pill */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+
+            {/* Row 1: actor chip + code + name */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <ActorChip actor={etapa.area_responsable} />
+              <span className="text-xs font-mono font-bold text-gray-600">
+                {etapa.cod}
               </span>
-            )}
-            {/* E16 alerta badge — WU-F2 */}
-            {etapa.cod === 'E16' && (
-              <AlertaE16 alerta_otpp={etapa.alerta_otpp} />
-            )}
-          </div>
-
-          {/* E21 inicio del plazo indicator */}
-          {etapa.cod === 'E21' && etapa.estado === 'COMPLETADO' && (
-            <div
-              className="text-xs mt-1 font-medium"
-              style={{ color: actorColor.text }}
-              aria-label="Inicio del plazo del servicio/bien"
-            >
-              Inicio del plazo del servicio/bien
+              <span className="text-sm font-semibold text-gray-800 truncate">
+                {etapa.nombre}
+              </span>
             </div>
-          )}
 
-          {/* Date info for non-loop, non-per-area stages */}
-          {!isBucle && !etapa.por_area && (
-            <div className="flex gap-3 text-xs mt-0.5" style={{ color: actorColor.text }}>
-              {fechaInicio && <span>Inicio: {formatFechaCorta(fechaInicio)}</span>}
-              {fechaFin && <span>Fin: {formatFechaCorta(fechaFin)}</span>}
-              {dias !== null && <span>{dias} d</span>}
-            </div>
-          )}
-
-          {/* Per-area summary */}
-          {etapa.por_area && etapa.filas.length > 0 && (
-            <div className="text-xs mt-0.5" style={{ color: actorColor.text }}>
-              {etapa.filas.length} area{etapa.filas.length !== 1 ? 's' : ''} registrada{etapa.filas.length !== 1 ? 's' : ''}
-              {etapa.monto_total !== null && (
-                <span className="ml-2 font-semibold">
-                  Total: S/ {etapa.monto_total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+            {/* Row 2: state pill + ronda badge + E16 alerta */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <EstadoPill estado={etapa.estado} />
+              {isBucle && latestRonda !== null && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-medium border"
+                  style={{
+                    backgroundColor: COLORES_ACTOR.BUCLE.bg,
+                    color: COLORES_ACTOR.BUCLE.text,
+                    borderColor: COLORES_ACTOR.BUCLE.border,
+                  }}
+                >
+                  Ronda {latestRonda}
                 </span>
               )}
+              {etapa.cod === 'E16' && (
+                <AlertaE16 alerta_otpp={etapa.alerta_otpp} />
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Registrar avance button — EDITOR/ADMIN only */}
-        {puedeEscribir && (
-          <div className="relative group flex-shrink-0">
-            <button
-              onClick={actionability.canRegister ? onRegistrar : undefined}
-              disabled={!actionability.canRegister}
-              className="text-xs px-2 py-1 rounded border font-medium transition-colors
-                         disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                borderColor: actorColor.border,
-                color: actorColor.text,
-                backgroundColor: 'white',
-              }}
-              aria-label={accionAriaLabel}
-              aria-disabled={!actionability.canRegister}
-            >
-              {accionLabel}
-            </button>
-            {/* Tooltip for blocked stages */}
-            {!actionability.canRegister && actionability.blockedReason && (
+            {/* E21: inicio del plazo */}
+            {etapa.cod === 'E21' && etapa.estado === 'COMPLETADO' && (
               <div
-                className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block
-                           bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap max-w-xs"
-                role="tooltip"
+                className="text-xs font-medium text-blue-700"
+                aria-label="Inicio del plazo del servicio/bien"
               >
-                {actionability.blockedReason}
+                Inicio del plazo del servicio/bien
               </div>
             )}
+
+            {/* Dates: non-loop, non-per-area */}
+            {!isBucle && !etapa.por_area && (
+              <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                {fechaInicio && <span>Inicio: {formatFechaCorta(fechaInicio)}</span>}
+                {fechaFin && <span>Fin: {formatFechaCorta(fechaFin)}</span>}
+                {dias !== null && <span>{dias} d</span>}
+              </div>
+            )}
+
+            {/* Per-area summary */}
+            {etapa.por_area && etapa.filas.length > 0 && (
+              <div className="text-xs text-gray-500">
+                {etapa.filas.length} area{etapa.filas.length !== 1 ? 's' : ''} registrada{etapa.filas.length !== 1 ? 's' : ''}
+                {etapa.monto_total !== null && (
+                  <span className="ml-2 font-semibold text-gray-700">
+                    Total: S/ {etapa.monto_total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Responsable (compact view) */}
+            {responsable && (
+              <div className="text-xs text-gray-500">
+                Responsable: <span className="text-gray-700">{responsable}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: action button + expand button */}
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            {/* Registrar / Editar / Bloqueado button — EDITOR/ADMIN only */}
+            {puedeEscribir && (
+              <div className="relative group">
+                <button
+                  onClick={actionability.canRegister ? onRegistrar : undefined}
+                  disabled={!actionability.canRegister}
+                  className="text-xs px-2.5 py-1 rounded border font-medium transition-colors
+                             disabled:opacity-40 disabled:cursor-not-allowed
+                             border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  aria-label={accionAriaLabel}
+                  aria-disabled={!actionability.canRegister}
+                >
+                  {accionLabel}
+                </button>
+                {/* Tooltip for blocked stages */}
+                {!actionability.canRegister && actionability.blockedReason && (
+                  <div
+                    className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block
+                               bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap max-w-xs"
+                    role="tooltip"
+                  >
+                    {actionability.blockedReason}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Expand/collapse button — only if there is detail to show */}
+            {tieneDetalle && (
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors
+                           flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-gray-100"
+                aria-label={expanded ? `Contraer detalle de ${etapa.cod}` : `Expandir detalle de ${etapa.cod}`}
+                aria-expanded={expanded}
+                data-testid="expand-toggle"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="6 3 11 8 6 13" />
+                </svg>
+                {expanded ? 'Menos' : 'Detalle'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* NO_APLICA quick-action */}
+        {puedeMarcarNoAplica && (
+          <div className="mt-2 flex flex-col gap-1">
+            <button
+              onClick={handleNoAplica}
+              disabled={noAplicaMutation.isPending}
+              className="text-xs px-2 py-1 rounded border font-medium transition-colors
+                         border-slate-300 text-slate-600 bg-slate-50
+                         hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed
+                         self-start"
+              aria-label={`Marcar ${etapa.cod} como No aplica`}
+            >
+              {noAplicaMutation.isPending ? 'Guardando...' : 'No aplica'}
+            </button>
+            {noAplicaError && (
+              <p className="text-xs text-red-600" role="alert">{noAplicaError}</p>
+            )}
+          </div>
+        )}
+
+        {/* WU-F3: Reiniciar TDR */}
+        {puedeEscribir && esCanceladoPorSinPresupuesto && (
+          <div className="mt-2 flex flex-col gap-1">
+            <button
+              onClick={() => {
+                setReiniciarError(null);
+                reiniciarMutation.mutate(undefined, {
+                  onError: (err) => {
+                    const msg = (err as { response?: { data?: { detail?: string } } })
+                      ?.response?.data?.detail;
+                    setReiniciarError(msg ?? 'No se pudo reiniciar el TDR');
+                  },
+                });
+              }}
+              disabled={reiniciarMutation.isPending}
+              className="text-xs px-3 py-1.5 rounded border font-medium transition-colors
+                         border-orange-400 text-orange-700 bg-orange-50
+                         hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed
+                         self-start"
+              aria-label="Reiniciar TDR: reabrir E02 en nueva ronda"
+            >
+              {reiniciarMutation.isPending ? 'Reiniciando...' : 'Reiniciar TDR (nueva ronda)'}
+            </button>
+            {reiniciarError && (
+              <p className="text-xs text-red-600" role="alert">{reiniciarError}</p>
+            )}
+          </div>
+        )}
+
+        {/* Rondas list for bucle stages */}
+        {isBucle && (
+          <div className="mt-2">
+            <RondasList
+              rondas={etapa.rondas}
+              procesoId={procesoId}
+              cod={etapa.cod}
+              canAddRonda={actionability.canRegister && puedeEscribir}
+              blockedReason={actionability.blockedReason}
+            />
           </div>
         )}
       </div>
 
-      {/* WU-F3: Reiniciar TDR — E10 card when proceso CANCELADO por SIN_PRESUPUESTO */}
-      {puedeEscribir && esCanceladoPorSinPresupuesto && (
-        <div className="mt-2 flex flex-col gap-1">
-          <button
-            onClick={() => {
-              setReiniciarError(null);
-              reiniciarMutation.mutate(undefined, {
-                onError: (err) => {
-                  const msg = (err as { response?: { data?: { detail?: string } } })
-                    ?.response?.data?.detail;
-                  setReiniciarError(msg ?? 'No se pudo reiniciar el TDR');
-                },
-              });
-            }}
-            disabled={reiniciarMutation.isPending}
-            className="text-xs px-3 py-1.5 rounded border font-medium transition-colors
-                       border-orange-400 text-orange-700 bg-orange-50
-                       hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Reiniciar TDR: reabrir E02 en nueva ronda"
-          >
-            {reiniciarMutation.isPending ? 'Reiniciando...' : 'Reiniciar TDR (nueva ronda)'}
-          </button>
-          {reiniciarError && (
-            <p className="text-xs text-red-600" role="alert">{reiniciarError}</p>
+      {/* Expandable detail panel */}
+      {tieneDetalle && expanded && (
+        <div
+          className="border-t border-gray-100 bg-gray-50 px-3 py-3 flex flex-col gap-3"
+          data-testid="detail-panel"
+        >
+          {observaciones && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Que ocurrio
+              </p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{observaciones}</p>
+            </div>
           )}
-        </div>
-      )}
-
-      {/* Rondas list for bucle stages */}
-      {isBucle && (
-        <div className="mt-2">
-          <RondasList
-            rondas={etapa.rondas}
-            procesoId={procesoId}
-            cod={etapa.cod}
-            canAddRonda={actionability.canRegister && puedeEscribir}
-            blockedReason={actionability.blockedReason}
-          />
+          {oficioCorreo && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Oficio / Correo
+              </p>
+              <p className="text-sm text-gray-700">{oficioCorreo}</p>
+            </div>
+          )}
+          {aceptaAdjuntos && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Documentos
+              </p>
+              <AdjuntosEtapa etapaId={etapaId} canEdit={puedeEscribir} />
+            </div>
+          )}
         </div>
       )}
     </article>

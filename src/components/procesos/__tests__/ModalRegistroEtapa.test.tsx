@@ -5,21 +5,26 @@
 
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ModalRegistroEtapa } from "@/components/procesos/ModalRegistroEtapa";
-import type { EtapaAgrupada } from "@/types/etapa";
+import type { EtapaAgrupada, RondaBucle } from "@/types/etapa";
+
+const mockRegistrar = vi.fn();
+const mockActualizar = vi.fn();
 
 vi.mock("@/hooks/useEtapas", () => ({
   useRegistrarEtapa: vi.fn(() => ({
-    mutate: vi.fn(),
+    mutate: mockRegistrar,
     isPending: false,
     isError: false,
     error: null,
   })),
   useActualizarEtapa: vi.fn(() => ({
-    mutate: vi.fn(),
+    mutate: mockActualizar,
     isPending: false,
+    isError: false,
+    error: null,
   })),
   useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
@@ -56,9 +61,26 @@ function makeEtapa(cod: string, overrides: Partial<EtapaAgrupada> = {}): EtapaAg
   };
 }
 
+// Mock authStore (needed after we call useAuthStore inside the modal)
+vi.mock("@/stores/authStore", () => ({
+  useAuthStore: vi.fn(() => ({
+    user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+    token: "t",
+    isAuthenticated: true,
+    login: vi.fn(),
+    logout: vi.fn(),
+  })),
+}));
+
+vi.mock("@/components/procesos/AdjuntosEtapa", () => ({
+  AdjuntosEtapa: () => React.createElement("div", { "data-testid": "adjuntos-mock" }),
+}));
+
 describe("ModalRegistroEtapa", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRegistrar.mockReset();
+    mockActualizar.mockReset();
   });
 
   it("E01 modal shows cmn_adjunto select field", () => {
@@ -201,5 +223,115 @@ describe("ModalRegistroEtapa", () => {
     );
 
     expect(container.firstChild).toBeNull();
+  });
+
+  // ---------------------------------------------------------------
+  // BUG #2: bucle modal must PUT last ronda when rondas exist (no duplicates)
+  // ---------------------------------------------------------------
+
+  it("BUG-2: bucle modal with existing ronda calls actualizar (PUT) not registrar (POST)", () => {
+    const rondaExistente: RondaBucle = {
+      id: 42,
+      nro_ronda: 1,
+      motivo_bucle: 'Observaciones iniciales',
+      estado_etapa: 'PENDIENTE',
+      fecha_inicio: '2026-04-01',
+      fecha_fin: null,
+      dias: null,
+    };
+    const etapa = makeEtapa('E05', {
+      es_bucle: true,
+      rondas: [rondaExistente],
+    });
+
+    render(
+      React.createElement(ModalRegistroEtapa, {
+        procesoId: 1,
+        etapa,
+        open: true,
+        onClose: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Fill required motivo_bucle field
+    const motivoTextarea = screen.getByLabelText(/Motivo de la Ronda/i);
+    fireEvent.change(motivoTextarea, { target: { value: 'Corrección enviada' } });
+
+    // Fill fecha_inicio
+    const fechaInput = screen.getByLabelText(/Fecha Inicio/i);
+    fireEvent.change(fechaInput, { target: { value: '2026-04-05' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Registrar avance/i }));
+
+    // Must call actualizar (PUT), NOT registrar (POST)
+    expect(mockActualizar).toHaveBeenCalledOnce();
+    expect(mockRegistrar).not.toHaveBeenCalled();
+
+    // Must target the existing ronda's id
+    const [callArgs] = mockActualizar.mock.calls;
+    expect(callArgs[0].etapaId).toBe(42);
+  });
+
+  it("BUG-2: bucle modal with NO existing rondas calls registrar (POST)", () => {
+    const etapa = makeEtapa('E05', {
+      es_bucle: true,
+      rondas: [],
+    });
+
+    render(
+      React.createElement(ModalRegistroEtapa, {
+        procesoId: 1,
+        etapa,
+        open: true,
+        onClose: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    const motivoTextarea = screen.getByLabelText(/Motivo de la Ronda/i);
+    fireEvent.change(motivoTextarea, { target: { value: 'Primera observación' } });
+
+    const fechaInput = screen.getByLabelText(/Fecha Inicio/i);
+    fireEvent.change(fechaInput, { target: { value: '2026-04-01' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Registrar avance/i }));
+
+    // No rondas → POST (first creation)
+    expect(mockRegistrar).toHaveBeenCalledOnce();
+    expect(mockActualizar).not.toHaveBeenCalled();
+  });
+
+  it("BUG-2: bucle modal with existing ronda shows its nro_ronda (not +1)", () => {
+    const rondaExistente: RondaBucle = {
+      id: 7,
+      nro_ronda: 3,
+      motivo_bucle: 'Tercera vuelta',
+      estado_etapa: 'PENDIENTE',
+      fecha_inicio: '2026-04-15',
+      fecha_fin: null,
+      dias: null,
+    };
+    const etapa = makeEtapa('E06', {
+      es_bucle: true,
+      rondas: [
+        { id: 5, nro_ronda: 1, motivo_bucle: 'R1', estado_etapa: 'COMPLETADO', fecha_inicio: '2026-04-01', fecha_fin: '2026-04-05', dias: 4 },
+        { id: 6, nro_ronda: 2, motivo_bucle: 'R2', estado_etapa: 'COMPLETADO', fecha_inicio: '2026-04-06', fecha_fin: '2026-04-10', dias: 4 },
+        rondaExistente,
+      ],
+    });
+
+    render(
+      React.createElement(ModalRegistroEtapa, {
+        procesoId: 1,
+        etapa,
+        open: true,
+        onClose: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Should show "Ronda 3" (existing), NOT "Ronda 4" (next new)
+    expect(screen.getByText(/Ronda 3 — asignado por el sistema/i)).toBeInTheDocument();
   });
 });

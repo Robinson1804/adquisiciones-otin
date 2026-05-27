@@ -14,12 +14,23 @@ vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn(),
 }));
 
+// AdjuntosEtapa is rendered inside the expandable panel.
+// Mock it to avoid needing the full useArchivos hook stack in these unit tests.
+vi.mock("@/components/procesos/AdjuntosEtapa", () => ({
+  AdjuntosEtapa: ({ etapaId }: { etapaId: number }) =>
+    React.createElement('div', { 'data-testid': `adjuntos-mock-${etapaId}` }, 'Adjuntos mock'),
+}));
+
 vi.mock("@/hooks/useEtapas", () => ({
   useAgregarRonda: vi.fn(() => ({
     mutate: vi.fn(),
     isPending: false,
   })),
   useReiniciarTdr: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
+  useRegistrarEtapa: vi.fn(() => ({
     mutate: vi.fn(),
     isPending: false,
   })),
@@ -286,7 +297,162 @@ describe("EtapaCard", () => {
     expect(screen.queryByRole('button', { name: /Reiniciar TDR/i })).not.toBeInTheDocument();
   });
 
-  it("COLORES_ACTOR applied — card has correct area color", () => {
+  // ---------------------------------------------------------------
+  // NO_APLICA state: badge + botón
+  // ---------------------------------------------------------------
+
+  it("EstadoBadge renders 'No aplica' label for NO_APLICA estado", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 2, username: "viewer", nombre_completo: "Viewer", rol: "VIEWER", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', { estado: 'NO_APLICA' as const });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByText('No aplica')).toBeInTheDocument();
+  });
+
+  it("EDITOR sees 'No aplica' button on PENDIENTE non-bucle stage", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', { estado: 'PENDIENTE', es_bucle: false, por_area: false });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByRole('button', { name: /Marcar E10 como No aplica/i })).toBeInTheDocument();
+  });
+
+  it("VIEWER does NOT see 'No aplica' button", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 2, username: "viewer", nombre_completo: "Viewer", rol: "VIEWER", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', { estado: 'PENDIENTE' });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /No aplica/i })).not.toBeInTheDocument();
+  });
+
+  it("bucle stage does NOT show 'No aplica' button even for EDITOR", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E05', { estado: 'PENDIENTE', es_bucle: true });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /No aplica/i })).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------
+  // BUG #4: NO_APLICA state — button must say "Editar" not "Registrar"
+  // ---------------------------------------------------------------
+
+  it("BUG-4: NO_APLICA stage shows 'Editar' button (not 'Registrar') for EDITOR", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E10', { estado: 'NO_APLICA' as const });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Should show "Editar" not "Registrar"
+    expect(screen.getByRole('button', { name: /Editar etapa E10/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Registrar avance/i })).not.toBeInTheDocument();
+  });
+
+  it("BUG-4: NO_APLICA stage does NOT show 'No aplica' quick-action button", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    // puedeMarcarNoAplica requires estado === 'PENDIENTE', so NO_APLICA must hide it
+    const etapa = makeEtapa('E10', { estado: 'NO_APLICA' as const, es_bucle: false, por_area: false });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /Marcar E10 como No aplica/i })).not.toBeInTheDocument();
+  });
+
+  it("card has neutral background — actor color no longer set as inline bg on card", () => {
     vi.mocked(useAuthStore).mockReturnValue({
       user: null,
       token: null,
@@ -307,8 +473,234 @@ describe("EtapaCard", () => {
       { wrapper: Wrapper }
     );
 
-    // AREAS color bg is #E8F5E9
+    // Actor color (#E8F5E9) is NOT applied as inline backgroundColor on the card article
     const article = container.querySelector('article');
-    expect(article).toHaveStyle({ backgroundColor: '#E8F5E9' });
+    expect(article).not.toHaveStyle({ backgroundColor: '#E8F5E9' });
+
+    // The left-border color IS set inline (estado color bar), not the actor bg
+    // For PENDIENTE estado, bar color is #D97706
+    expect(article).toHaveStyle({ borderLeftColor: '#D97706' });
+  });
+
+  // ---------------------------------------------------------------
+  // New layout: actor chip + estado pill + expand/collapse
+  // ---------------------------------------------------------------
+
+  it("actor chip is present with the actor label", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E02', { area_responsable: 'OTIN' });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByTestId('actor-chip')).toBeInTheDocument();
+    expect(screen.getByTestId('actor-chip')).toHaveTextContent('OTIN');
+  });
+
+  it("estado pill renders with correct label for EN_CURSO", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E02', { estado: 'EN_CURSO' });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByTestId('estado-pill')).toHaveTextContent('En Curso');
+  });
+
+  it("estado pill renders with correct label for COMPLETADO", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E03', { estado: 'COMPLETADO' });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByTestId('estado-pill')).toHaveTextContent('Completado');
+  });
+
+  it("expand toggle is present when etapa has observaciones", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E02', {
+      estado: 'COMPLETADO',
+      filas: [{
+        id: 5, area_usuaria: 'OTIN', estado_etapa: 'COMPLETADO',
+        fecha_inicio: '2026-01-10', fecha_fin: '2026-01-15', dias: 5,
+        observaciones: 'TDR revisado y aprobado.',
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByTestId('expand-toggle')).toBeInTheDocument();
+  });
+
+  it("clicking expand toggle reveals observaciones in detail panel", async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E02', {
+      estado: 'COMPLETADO',
+      filas: [{
+        id: 5, area_usuaria: 'OTIN', estado_etapa: 'COMPLETADO',
+        fecha_inicio: '2026-01-10', fecha_fin: '2026-01-15', dias: 5,
+        observaciones: 'TDR revisado y aprobado.',
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // detail panel hidden initially
+    expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
+
+    // click expand
+    await user.click(screen.getByTestId('expand-toggle'));
+
+    // detail panel now visible with observaciones text
+    expect(screen.getByTestId('detail-panel')).toBeInTheDocument();
+    expect(screen.getByText('TDR revisado y aprobado.')).toBeInTheDocument();
+  });
+
+  it("clicking expand toggle twice collapses the detail panel", async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E02', {
+      estado: 'COMPLETADO',
+      filas: [{
+        id: 5, area_usuaria: 'OTIN', estado_etapa: 'COMPLETADO',
+        fecha_inicio: '2026-01-10', fecha_fin: null, dias: null,
+        oficio_correo: 'Oficio N° 001-2026',
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    const toggle = screen.getByTestId('expand-toggle');
+    await user.click(toggle);
+    expect(screen.getByTestId('detail-panel')).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
+  });
+
+  it("expand toggle is NOT present when etapa has no detail content", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    // E04 has no acepta_adjuntos, no observaciones, no oficio — no toggle expected
+    const etapa = makeEtapa('E04', {
+      area_responsable: 'OTA',
+      estado: 'PENDIENTE',
+      filas: [],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByTestId('expand-toggle')).not.toBeInTheDocument();
   });
 });

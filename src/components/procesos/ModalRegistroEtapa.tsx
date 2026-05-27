@@ -13,7 +13,7 @@
 
 import React, { useState } from "react";
 import { ETAPAS_CONFIG, CODIGOS_CON_ADJUNTOS } from "@/lib/constants";
-import { useRegistrarEtapa } from "@/hooks/useEtapas";
+import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 import { useAuthStore } from "@/stores/authStore";
 import { TablaAreasE11 } from "./TablaAreasE11";
 import { TablaAreasE24 } from "./TablaAreasE24";
@@ -71,13 +71,25 @@ export function ModalRegistroEtapa({
   areasUsuarias = [],
   fechaInicioSugerida = null,
 }: ModalRegistroEtapaProps) {
-  const { mutate: registrar, isPending, isError, error } = useRegistrarEtapa(procesoId);
+  const { mutate: registrar, isPending: isRegistrando, isError: isRegistrarError, error: registrarError } = useRegistrarEtapa(procesoId);
+  const { mutate: actualizar, isPending: isActualizando, isError: isActualizarError, error: actualizarError } = useActualizarEtapa(procesoId);
+
+  const isPending = isRegistrando || isActualizando;
+  const isError = isRegistrarError || isActualizarError;
+  const error = registrarError ?? actualizarError;
   const { user } = useAuthStore();
   const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
   const camposExtra = getCamposExtra(etapa.cod);
   const isBucle = etapa.es_bucle;
   const isPorArea = etapa.por_area;
+
+  // For bucle stages: if at least one ronda exists, we PUT the last one (update)
+  // instead of POST (insert). This prevents duplicates: agregar-ronda creates a
+  // PENDIENTE row; "Registrar avance" completes it via PUT.
+  const lastRonda = isBucle && etapa.rondas.length > 0
+    ? etapa.rondas.reduce((max, r) => (r.nro_ronda > max.nro_ronda ? r : max))
+    : null;
 
   // Existing registration for simple stages — used to prefill the form when
   // reopening an already-registered/completed stage. Bucle stages always add a
@@ -86,11 +98,14 @@ export function ModalRegistroEtapa({
   const numOrEmpty = (v: number | null | undefined) =>
     v != null ? String(v) : "";
 
-  // Compute next ronda number for display (display-only)
+  // Display ronda number: when updating an existing ronda (lastRonda !== null),
+  // show that ronda's number; otherwise show the next number (new ronda via POST).
   const nextRonda =
-    isBucle && etapa.rondas.length > 0
-      ? Math.max(...etapa.rondas.map((r) => r.nro_ronda)) + 1
-      : 1;
+    isBucle && lastRonda !== null
+      ? lastRonda.nro_ronda
+      : isBucle && etapa.rondas.length > 0
+        ? Math.max(...etapa.rondas.map((r) => r.nro_ronda)) + 1
+        : 1;
 
   // Form state — prefilled from the existing row; for a new registration,
   // fecha_inicio defaults to the previous chain stage's end (consecutive flow).
@@ -218,9 +233,20 @@ export function ModalRegistroEtapa({
     if (camposExtra.includes('plazo_entrega') && plazoEntrega)
       payload.plazo_entrega = parseInt(plazoEntrega, 10);
 
-    registrar(payload, {
-      onSuccess: () => onClose(),
-    });
+    // BUG-2 fix: for bucle stages with an existing ronda, PUT the last ronda
+    // instead of POSTing a new one. This avoids the duplicate-ronda problem where
+    // "Agregar ronda" creates a PENDIENTE row and "Registrar avance" was creating
+    // a second completed row.
+    if (isBucle && lastRonda !== null) {
+      actualizar(
+        { etapaId: lastRonda.id, payload },
+        { onSuccess: () => onClose() }
+      );
+    } else {
+      registrar(payload, {
+        onSuccess: () => onClose(),
+      });
+    }
   }
 
   return (

@@ -349,14 +349,13 @@ describe("getEtapaActionability — C3c main chain", () => {
 // ----------------------------------------------------------------
 
 describe("C3c catalog sync — CODIGOS_CON_ADJUNTOS", () => {
-  it("ETAPAS_CONFIG has exactly 12 entries with acepta_adjuntos=true", () => {
+  it("ETAPAS_CONFIG entries with acepta_adjuntos=true match CODIGOS_CON_ADJUNTOS exactly", () => {
     const fromConfig = new Set(
       (ETAPAS_CONFIG as readonly { cod: string; acepta_adjuntos?: boolean }[])
         .filter((e) => e.acepta_adjuntos === true)
         .map((e) => e.cod)
     );
-    expect(fromConfig.size).toBe(12);
-    expect(CODIGOS_CON_ADJUNTOS.size).toBe(12);
+    expect(fromConfig.size).toBe(CODIGOS_CON_ADJUNTOS.size);
     // Both sets must be identical
     for (const cod of fromConfig) {
       expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(true);
@@ -366,17 +365,60 @@ describe("C3c catalog sync — CODIGOS_CON_ADJUNTOS", () => {
     }
   });
 
-  it("CODIGOS_CON_ADJUNTOS contains all 12 expected key stage codes", () => {
-    const expected = ['E01','E02','E03','E07','E09','E11','E13','E14','E15','E16','E19','E24'];
+  it("CODIGOS_CON_ADJUNTOS contains all expected key stage codes", () => {
+    const expected = [
+      'E01','E02','E03','E06','E06b','E07','E08',
+      'E09','E11','E13','E14','E15','E16','E19','E20','E22','E24',
+    ];
     for (const cod of expected) {
       expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(true);
     }
   });
 
   it("CODIGOS_CON_ADJUNTOS does NOT contain non-key stages", () => {
-    const nonKey = ['E04','E05','E06','E08','E08a','E08b','E10','E12','E17','E18','E20','E21','E22','E23','E25'];
+    const nonKey = ['E04','E05','E08a','E08b','E10','E12','E17','E18','E21','E23','E25'];
     for (const cod of nonKey) {
       expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(false);
     }
+  });
+
+  // New stages added in this iteration
+  it("E06b is in ETAPAS_CONFIG as a bucle entry", () => {
+    const e06b = (ETAPAS_CONFIG as readonly { cod: string; es_bucle?: boolean }[])
+      .find((e) => e.cod === 'E06b');
+    expect(e06b).toBeDefined();
+    expect(e06b?.es_bucle).toBe(true);
+  });
+
+  it("CODIGOS_CON_ADJUNTOS includes newly added E06, E06b, E08, E20, E22", () => {
+    for (const cod of ['E06', 'E06b', 'E08', 'E20', 'E22']) {
+      expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(true);
+    }
+  });
+
+  // NO_APLICA — prereq satisfaction
+  it("NO_APLICA prereq satisfies the next stage (same as COMPLETADO)", () => {
+    const e07 = { cod: 'E07', nombre: 'E07', area_responsable: 'OEAS', es_bucle: false,
+      por_area: false, estado: 'PENDIENTE' as const, filas: [], rondas: [], alerta_otpp: null, monto_total: null };
+    const e04NoAplica = { cod: 'E04', nombre: 'E04', area_responsable: 'OTA', es_bucle: false,
+      por_area: false, estado: 'NO_APLICA' as const, filas: [], rondas: [], alerta_otpp: null, monto_total: null };
+    const result = getEtapaActionability(e07, [e04NoAplica, e07]);
+    expect(result.canRegister).toBe(true);
+    expect(result.blockedReason).toBeNull();
+  });
+
+  it("NO_APLICA does NOT block E12 R3 check (not counted as PENDIENTE)", () => {
+    const e11 = { cod: 'E11', nombre: 'E11', area_responsable: 'AREAS', es_bucle: false,
+      por_area: true, estado: 'COMPLETADO' as const,
+      filas: [
+        { id: 1, area_usuaria: 'DTDIS', estado_etapa: 'COMPLETADO', fecha_inicio: null, fecha_fin: null, dias: null },
+        { id: 2, area_usuaria: 'OGA',   estado_etapa: 'NO_APLICA',  fecha_inicio: null, fecha_fin: null, dias: null },
+      ],
+      rondas: [], alerta_otpp: null, monto_total: null };
+    const e12 = { cod: 'E12', nombre: 'E12', area_responsable: 'OTIN', es_bucle: false,
+      por_area: false, estado: 'PENDIENTE' as const, filas: [], rondas: [], alerta_otpp: null, monto_total: null };
+    const result = getEtapaActionability(e12, [e11, e12]);
+    // OGA is NO_APLICA, not PENDIENTE → should not block
+    expect(result.canRegister).toBe(true);
   });
 });

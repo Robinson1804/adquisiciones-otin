@@ -37,7 +37,7 @@ export interface RondaBucle {
   dias: number | null;
 }
 
-export type EstadoEtapa = 'COMPLETADO' | 'EN_CURSO' | 'PENDIENTE' | 'OMITIDO';
+export type EstadoEtapa = 'COMPLETADO' | 'EN_CURSO' | 'PENDIENTE' | 'OMITIDO' | 'NO_APLICA';
 
 export interface EtapaAgrupada {
   cod: string;

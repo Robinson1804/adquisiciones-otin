@@ -370,8 +370,8 @@ describe("AdjuntosEtapa — upload error surfacing", () => {
 // ----------------------------------------------------------------
 
 describe("AdjuntosEtapa — catalog sync gating (CODIGOS_CON_ADJUNTOS)", () => {
-  it("CODIGOS_CON_ADJUNTOS has exactly 12 key stage codes", () => {
-    expect(CODIGOS_CON_ADJUNTOS.size).toBe(12);
+  it("CODIGOS_CON_ADJUNTOS has exactly 17 key stage codes", () => {
+    expect(CODIGOS_CON_ADJUNTOS.size).toBe(17);
   });
 
   it("E04 is NOT in CODIGOS_CON_ADJUNTOS", () => {

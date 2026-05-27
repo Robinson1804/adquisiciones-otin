@@ -55,6 +55,7 @@ export const PREREQUISITOS: Record<string, string[]> = {
   // Optional loops (anchor to chain stages; do NOT block main chain)
   E05: ['E04'],       // R6 — E04 must be COMPLETADO
   E06: ['E04'],       // R6
+  E06b: ['E04'],      // R6 — same anchor as E05/E06; bucle OTIN→DTDIS
   E08a: ['E08'],
   E08b: ['E08'],
 };
@@ -99,8 +100,11 @@ export function getEtapaActionability(
   for (const prereqCod of prereqs) {
     const prereqEtapa = allEtapas.find((e) => e.cod === prereqCod);
 
-    // Prereq stage not found or not completed
-    if (!prereqEtapa || prereqEtapa.estado !== 'COMPLETADO') {
+    // Prereq stage not found or not completed/no-aplica
+    // NO_APLICA satisfies prereqs the same way COMPLETADO does (backend-mirrored)
+    const prereqSatisfied =
+      prereqEtapa?.estado === 'COMPLETADO' || prereqEtapa?.estado === 'NO_APLICA';
+    if (!prereqSatisfied) {
       return {
         canRegister: false,
         blockedReason: blockMessage(etapa.cod, prereqCod),

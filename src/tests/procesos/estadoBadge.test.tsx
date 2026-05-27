@@ -20,24 +20,24 @@ describe("Estado badge color mapping", () => {
     const key = ESTADO_BADGE_MAP["EN PROCESO"];
     expect(key).toBe("EN_CURSO");
     expect(COLORES_ESTADO[key]).toBeDefined();
-    expect(COLORES_ESTADO[key].bg).toBe("#DDEBF7");
-    expect(COLORES_ESTADO[key].text).toBe("#1F3864");
+    expect(COLORES_ESTADO[key].bg).toBe("#DBEAFE");
+    expect(COLORES_ESTADO[key].text).toBe("#1D4ED8");
   });
 
   it("CULMINADO maps to COMPLETADO key with correct colors", () => {
     const key = ESTADO_BADGE_MAP["CULMINADO"];
     expect(key).toBe("COMPLETADO");
     expect(COLORES_ESTADO[key]).toBeDefined();
-    expect(COLORES_ESTADO[key].bg).toBe("#C6EFCE");
-    expect(COLORES_ESTADO[key].text).toBe("#276221");
+    expect(COLORES_ESTADO[key].bg).toBe("#DCFCE7");
+    expect(COLORES_ESTADO[key].text).toBe("#15803D");
   });
 
   it("CANCELADO maps to CANCELADO key with correct colors", () => {
     const key = ESTADO_BADGE_MAP["CANCELADO"];
     expect(key).toBe("CANCELADO");
     expect(COLORES_ESTADO[key]).toBeDefined();
-    expect(COLORES_ESTADO[key].bg).toBe("#FFCDD2");
-    expect(COLORES_ESTADO[key].text).toBe("#B71C1C");
+    expect(COLORES_ESTADO[key].bg).toBe("#FEE2E2");
+    expect(COLORES_ESTADO[key].text).toBe("#B91C1C");
   });
 
   it("all EstadoProceso values are mapped", () => {

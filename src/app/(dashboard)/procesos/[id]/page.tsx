@@ -10,7 +10,7 @@ import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
-import { useProceso, useActualizarProceso } from "@/hooks/useProcesos";
+import { useProceso, useActualizarProceso, useEliminarProceso } from "@/hooks/useProcesos";
 import { useMontosProceso } from "@/hooks/useMontosProceso";
 import { useExportProcesoPdf } from "@/hooks/useExport";
 import { LineaTiempo } from "@/components/procesos/LineaTiempo";
@@ -89,6 +89,31 @@ export default function DetalleProceso() {
 
   const { mutate: actualizarProceso, isPending: isUpdating } =
     useActualizarProceso();
+
+  const { mutate: eliminarProceso, isPending: isDeleting } =
+    useEliminarProceso();
+
+  // Modal de confirmación de eliminación
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function handleEliminar() {
+    if (!proceso) return;
+    setDeleteError(null);
+    eliminarProceso(proceso.id, {
+      onSuccess: () => {
+        router.push("/procesos");
+      },
+      onError: (err) => {
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        const msg =
+          axiosErr?.response?.data?.detail ??
+          err.message ??
+          "Error al eliminar el proceso.";
+        setDeleteError(msg);
+      },
+    });
+  }
 
   // C5 — PDF export
   const {
@@ -190,6 +215,20 @@ export default function DetalleProceso() {
               aria-label="Editar proceso"
             >
               Editar
+            </button>
+          )}
+          {puedeEscribir && !editMode && (
+            <button
+              onClick={() => {
+                setDeleteError(null);
+                setShowDeleteModal(true);
+              }}
+              className="px-4 py-1.5 bg-white border border-red-300 rounded text-sm text-red-600
+                         hover:bg-red-50 transition-colors"
+              aria-label="Eliminar proceso"
+              data-testid="btn-eliminar-proceso"
+            >
+              Eliminar proceso
             </button>
           )}
         </div>
@@ -359,6 +398,57 @@ export default function DetalleProceso() {
           procesoEstado={proceso.estado}
         />
       </div>
+
+      {/* Modal de confirmación de eliminación */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-eliminar-titulo"
+          data-testid="modal-eliminar-proceso"
+        >
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+            <h2
+              id="modal-eliminar-titulo"
+              className="text-base font-bold text-gray-900"
+            >
+              Eliminar proceso
+            </h2>
+            <p className="text-sm text-gray-700">
+              ¿Estás seguro de que querés eliminar el proceso{" "}
+              <span className="font-mono font-semibold">{proceso.id_proceso}</span>?
+              Se borrará todo y desaparecerá del sistema. Esta acción no se puede
+              deshacer desde la interfaz.
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-600" role="alert">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 border border-outline rounded text-sm text-gray-700
+                           hover:bg-surface-content transition-colors disabled:opacity-50"
+                data-testid="btn-cancelar-eliminar"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 text-white rounded text-sm font-semibold
+                           hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-confirmar-eliminar"
+              >
+                {isDeleting ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

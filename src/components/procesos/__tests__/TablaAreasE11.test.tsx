@@ -5,22 +5,40 @@
 
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TablaAreasE11 } from "@/components/procesos/TablaAreasE11";
 import type { FilaArea } from "@/types/etapa";
 
+
+const mockRegistrar = vi.fn();
+const mockActualizar = vi.fn();
+
 // Mock hooks
 vi.mock("@/hooks/useEtapas", () => ({
   useRegistrarEtapa: vi.fn(() => ({
-    mutate: vi.fn(),
+    mutate: mockRegistrar,
     isPending: false,
   })),
   useActualizarEtapa: vi.fn(() => ({
-    mutate: vi.fn(),
+    mutate: mockActualizar,
     isPending: false,
   })),
   useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock("@/stores/authStore", () => ({
+  useAuthStore: vi.fn(() => ({
+    user: { id: 1, username: "admin", nombre_completo: "Admin", rol: "ADMIN", area: null },
+    token: "t",
+    isAuthenticated: true,
+    login: vi.fn(),
+    logout: vi.fn(),
+  })),
+}));
+
+vi.mock("@/components/procesos/AdjuntosEtapa", () => ({
+  AdjuntosEtapa: () => React.createElement("div", { "data-testid": "adjuntos-mock" }),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -54,6 +72,8 @@ const filas: FilaArea[] = [
 describe("TablaAreasE11", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRegistrar.mockReset();
+    mockActualizar.mockReset();
   });
 
   it("renders 2 rows for 2 areas", () => {
@@ -101,5 +121,89 @@ describe("TablaAreasE11", () => {
     );
 
     expect(screen.getByRole('button', { name: /Editar DTDIS/i })).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------
+  // BUG #5: No aplica per row in E11
+  // ---------------------------------------------------------------
+
+  it("BUG-5: shows 'No aplica' button for PENDIENTE area (no existing fila)", () => {
+    render(
+      React.createElement(TablaAreasE11, {
+        procesoId: 1,
+        filas: [],
+        areasUsuarias: ['DTDIS'],
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByRole('button', { name: /Marcar DTDIS como No aplica en E11/i })).toBeInTheDocument();
+  });
+
+  it("BUG-5: clicking 'No aplica' on area without fila calls registrar with NO_APLICA", () => {
+    render(
+      React.createElement(TablaAreasE11, {
+        procesoId: 1,
+        filas: [],
+        areasUsuarias: ['DTDIS'],
+      }),
+      { wrapper: Wrapper }
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Marcar DTDIS como No aplica en E11/i }));
+
+    expect(mockRegistrar).toHaveBeenCalledOnce();
+    const [callArgs] = mockRegistrar.mock.calls;
+    expect(callArgs[0].estado_etapa).toBe('NO_APLICA');
+    expect(callArgs[0].area_usuaria).toBe('DTDIS');
+    expect(callArgs[0].codigo_etapa).toBe('E11');
+  });
+
+  it("BUG-5: clicking 'No aplica' on area with existing fila calls actualizar with NO_APLICA", () => {
+    const filaExistente = filas[0]!; // DTDIS, id=1
+    render(
+      React.createElement(TablaAreasE11, {
+        procesoId: 1,
+        filas: [filaExistente],
+        areasUsuarias: ['DTDIS'],
+      }),
+      { wrapper: Wrapper }
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Marcar DTDIS como No aplica en E11/i }));
+
+    expect(mockActualizar).toHaveBeenCalledOnce();
+    const [callArgs] = mockActualizar.mock.calls;
+    expect(callArgs[0].etapaId).toBe(1);
+    expect(callArgs[0].payload.estado_etapa).toBe('NO_APLICA');
+  });
+
+  it("BUG-5: row with estado NO_APLICA shows 'No aplica' badge and Editar button (not 'No aplica' button)", () => {
+    const filaNoAplica: FilaArea = {
+      id: 3,
+      area_usuaria: 'DTDIS',
+      estado_etapa: 'NO_APLICA',
+      fecha_inicio: '2026-05-10',
+      fecha_fin: null,
+      dias: null,
+    };
+
+    render(
+      React.createElement(TablaAreasE11, {
+        procesoId: 1,
+        filas: [filaNoAplica],
+        areasUsuarias: ['DTDIS'],
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Badge should say "No aplica"
+    expect(screen.getByText('No aplica')).toBeInTheDocument();
+
+    // "No aplica" action button must be hidden (stage already in NO_APLICA)
+    expect(screen.queryByRole('button', { name: /Marcar DTDIS como No aplica en E11/i })).not.toBeInTheDocument();
+
+    // "Editar" button must be present to allow reversing
+    expect(screen.getByRole('button', { name: /Editar DTDIS en E11/i })).toBeInTheDocument();
   });
 });

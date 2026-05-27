@@ -7,14 +7,14 @@ import { ETAPAS_CONFIG, COLORES_ACTOR } from "@/lib/constants";
 // Test 1 — ETAPAS_CONFIG completeness (pure unit, no render)
 // ----------------------------------------------------------------
 describe("ETAPAS_CONFIG", () => {
-  it("has exactly 27 stages", () => {
-    expect(ETAPAS_CONFIG.length).toBe(27);
+  it("has exactly 28 stages", () => {
+    expect(ETAPAS_CONFIG.length).toBe(28);
   });
 
   it("contains all expected cod values", () => {
     const cods = ETAPAS_CONFIG.map((e) => e.cod);
     const expected = [
-      "E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08",
+      "E01", "E02", "E03", "E04", "E05", "E06", "E06b", "E07", "E08",
       "E08a", "E08b", "E09", "E10", "E11", "E12", "E13", "E14",
       "E15", "E16", "E17", "E18", "E19", "E20", "E21", "E22",
       "E23", "E24", "E25",
@@ -25,7 +25,7 @@ describe("ETAPAS_CONFIG", () => {
   it("has unique cod values", () => {
     const cods = ETAPAS_CONFIG.map((e) => e.cod);
     const unique = new Set(cods);
-    expect(unique.size).toBe(27);
+    expect(unique.size).toBe(28);
   });
 });
 
