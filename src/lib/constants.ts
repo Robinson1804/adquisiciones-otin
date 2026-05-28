@@ -141,45 +141,19 @@ export const ETAPAS_CONFIG = [
 ] as const;
 
 // ============================================================
-// DEPENDENCIAS INEI — 39 áreas reales (fuente: Excel de metas OTIN)
-// Orden: OTIN primero, resto en secuencia oficial.
+// DEPENDENCIAS INEI — 13 áreas centrales (sin ODEI regionales).
+// Orden: OTIN primero, resto alfabético. Fuente: Excel de metas OTIN.
 // El campo `abrev` es el valor que se almacena en areas_usuarias.
 // ============================================================
 export interface Dependencia { abrev: string; nombre: string; }
 export const DEPENDENCIAS: readonly Dependencia[] = [
   { abrev: "OTIN",                       nombre: "OTIN - OFICINA TECNICA DE INFORMATICA" },
-  { abrev: "CID",                        nombre: "CID - CENTRO DE INVESTIGACION Y DESARROLLO" },
+  { abrev: "CIDE",                       nombre: "CIDE - CENTRO DE INVESTIGACION Y DESARROLLO" },
   { abrev: "DNCE",                       nombre: "DNCE - DIRECCION NACIONAL DE CENSOS Y ENCUESTAS" },
   { abrev: "DNCN",                       nombre: "DNCN - DIRECCION NACIONAL DE CUENTAS NACIONALES" },
   { abrev: "DTDIS",                      nombre: "DTDIS - DIREC. TEC. DE DEMOGRAFIA E INDI. SOCIALES" },
   { abrev: "DTIE",                       nombre: "DTIE - DIRECCION TECNICA DE INDICADORES ECONOMICOS" },
   { abrev: "ENEI",                       nombre: "ENEI - ESCUELA NACIONAL DE ESTADISTICA E INFORMATICA" },
-  { abrev: "ODEI - REGION LIMA",         nombre: "ODEI - REGION LIMA" },
-  { abrev: "ODEI-AMAZONAS",              nombre: "ODEI - AMAZONAS" },
-  { abrev: "ODEI-ANCASH-HUARAZ",         nombre: "ODEI - ANCASH - HUARAZ" },
-  { abrev: "ODEI-ANCASH-OZ. CHIMBOTE",   nombre: "ODEI - ANCASH: OFICINA ZONAL DE CHIMBOTE" },
-  { abrev: "ODEI-APURIMAC",              nombre: "ODEI - APURIMAC" },
-  { abrev: "ODEI-AREQUIPA",              nombre: "ODEI - AREQUIPA" },
-  { abrev: "ODEI-AYACUCHO",              nombre: "ODEI - AYACUCHO" },
-  { abrev: "ODEI-CAJAMARCA",             nombre: "ODEI - CAJAMARCA" },
-  { abrev: "ODEI-CUSCO",                 nombre: "ODEI - CUSCO" },
-  { abrev: "ODEI-HUANCAVELICA",          nombre: "ODEI - HUANCAVELICA" },
-  { abrev: "ODEI-HUANUCO",               nombre: "ODEI - HUANUCO" },
-  { abrev: "ODEI-ICA",                   nombre: "ODEI - ICA" },
-  { abrev: "ODEI-JUNIN",                 nombre: "ODEI - JUNIN" },
-  { abrev: "ODEI-LA LIBERTAD",           nombre: "ODEI - LA LIBERTAD" },
-  { abrev: "ODEI-LAMBAYEQUE",            nombre: "ODEI - LAMBAYEQUE" },
-  { abrev: "ODEI-LORETO",                nombre: "ODEI - LORETO" },
-  { abrev: "ODEI-MADRE DE DIOS",         nombre: "ODEI - MADRE DE DIOS" },
-  { abrev: "ODEI-MOQUEGUA",              nombre: "ODEI - MOQUEGUA" },
-  { abrev: "ODEI-PASCO",                 nombre: "ODEI - PASCO" },
-  { abrev: "ODEI-PIURA",                 nombre: "ODEI - PIURA" },
-  { abrev: "ODEI-PUNO",                  nombre: "ODEI - PUNO" },
-  { abrev: "ODEI-SAN MARTIN-MOYOBAMBA", nombre: "ODEI - SAN MARTIN - MOYOBAMBA" },
-  { abrev: "ODEI-SAN MARTIN-OZ.TARAPO", nombre: "ODEI - SAN MARTIN: OFICINA ZONAL DE TARAPOTO" },
-  { abrev: "ODEI-TACNA",                 nombre: "ODEI - TACNA" },
-  { abrev: "ODEI-TUMBES",                nombre: "ODEI - TUMBES" },
-  { abrev: "ODEI-UCAYALI",               nombre: "ODEI - UCAYALI" },
   { abrev: "OTA",                        nombre: "OTA - OFICINA TECNICA DE ADMINISTRACION" },
   { abrev: "OTAJ",                       nombre: "OTAJ - OFICINA TECNICA DE ASESORIA JURIDICA" },
   { abrev: "OTD",                        nombre: "OTD - OFICINA TECNICA DE DIFUSION" },

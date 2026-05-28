@@ -2,9 +2,9 @@
  * T-17b — S3 AreaSelector buscable + DEPENDENCIAS tests.
  *
  * Cubre:
- *   (a) El buscador filtra: escribir "OTIN" muestra OTIN; "ODEI" muestra varias.
+ *   (a) El buscador filtra: escribir "OTIN" muestra OTIN; búsqueda vacía muestra todo.
  *   (b) Togglear agrega/quita el abrev en areas_usuarias (valor del form).
- *   (c) La constante DEPENDENCIAS tiene exactamente 39 entradas.
+ *   (c) La constante DEPENDENCIAS tiene exactamente 13 entradas (sin ODEI regionales).
  */
 
 import React from "react";
@@ -70,8 +70,8 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 // (c) Constante pura — no necesita DOM
 // ----------------------------------------------------------------
 describe("DEPENDENCIAS constant", () => {
-  it("has exactly 39 entries", () => {
-    expect(DEPENDENCIAS).toHaveLength(39);
+  it("has exactly 13 entries (sin ODEI regionales)", () => {
+    expect(DEPENDENCIAS).toHaveLength(13);
   });
 
   it("first entry is OTIN", () => {
@@ -116,28 +116,22 @@ describe("S3 — AreaSelector buscador filtra dependencias", () => {
       expect(screen.getByRole("button", { name: /^Area OTIN$/i })).toBeInTheDocument();
     });
 
-    // Las ODEIs no deben aparecer (no contienen "OTIN")
-    expect(screen.queryByRole("button", { name: /^Area ODEI-AMAZONAS$/i })).not.toBeInTheDocument();
-    // OTPP tampoco — no contiene "OTIN"
+    // OTPP no contiene "OTIN" → tampoco aparece
     expect(screen.queryByRole("button", { name: /^Area OTPP$/i })).not.toBeInTheDocument();
   });
 
-  it("escribir 'ODEI' muestra multiples entradas ODEI", async () => {
+  it("escribir 'ODEI' (ya removidas) no devuelve resultados", async () => {
     render(React.createElement(NuevoProcesoPage), { wrapper: Wrapper });
 
     const searchInput = screen.getByPlaceholderText(/buscar por abreviatura o nombre/i);
     fireEvent.change(searchInput, { target: { value: "ODEI" } });
 
     await waitFor(() => {
-      // Debe haber al menos 5 botones de ODEI visibles
       const odeiButtons = screen
-        .getAllByRole("button")
+        .queryAllByRole("button")
         .filter((btn) => btn.getAttribute("aria-label")?.startsWith("Area ODEI"));
-      expect(odeiButtons.length).toBeGreaterThanOrEqual(5);
+      expect(odeiButtons).toHaveLength(0);
     });
-
-    // OTIN no debe aparecer (no contiene "ODEI")
-    expect(screen.queryByRole("button", { name: /^Area OTIN$/i })).not.toBeInTheDocument();
   });
 
   it("busqueda vacía muestra todas las dependencias", async () => {
@@ -252,9 +246,9 @@ describe("S3 — AreaSelector toggle agrega y quita abrev", () => {
     // Seleccionar tipo
     fireEvent.click(screen.getByDisplayValue("SERVICIO"));
 
-    // Seleccionar OTIN y CID
+    // Seleccionar OTIN y DTDIS
     fireEvent.click(screen.getByRole("button", { name: /^Area OTIN$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Area CID$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Area DTDIS$/i }));
 
     // Submit
     fireEvent.click(screen.getByRole("button", { name: /Crear Proceso/i }));
@@ -265,7 +259,7 @@ describe("S3 — AreaSelector toggle agrega y quita abrev", () => {
 
     const callArg = mockMutate.mock.calls[0][0] as { areas_usuarias: string[] };
     expect(callArg.areas_usuarias).toContain("OTIN");
-    expect(callArg.areas_usuarias).toContain("CID");
+    expect(callArg.areas_usuarias).toContain("DTDIS");
     expect(callArg.areas_usuarias).toHaveLength(2);
   });
 });
