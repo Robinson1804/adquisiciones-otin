@@ -27,6 +27,7 @@ vi.mock("@/hooks/useEtapas", () => ({
   useAgregarRonda: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useRegistrarEtapa: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useActualizarEtapa: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 // Mock ModalRegistroEtapa to avoid deep render

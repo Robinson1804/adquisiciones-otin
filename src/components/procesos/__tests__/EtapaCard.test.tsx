@@ -34,9 +34,14 @@ vi.mock("@/hooks/useEtapas", () => ({
     mutate: vi.fn(),
     isPending: false,
   })),
+  useActualizarEtapa: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
 }));
 
 import { useAuthStore } from "@/stores/authStore";
+import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 import type { FilaArea } from "@/types/etapa";
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -702,5 +707,112 @@ describe("EtapaCard", () => {
     );
 
     expect(screen.queryByTestId('expand-toggle')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------
+  // Bug #6: "No aplica" must use PUT when a row already exists
+  // ---------------------------------------------------------------
+
+  it("BUG-6: 'No aplica' click calls useRegistrarEtapa (POST) when etapa has no filas", async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    const mockRegistrarMutate = vi.fn();
+    const mockActualizarMutate = vi.fn();
+    vi.mocked(useRegistrarEtapa).mockReturnValue({
+      mutate: mockRegistrarMutate,
+      isPending: false,
+    } as ReturnType<typeof useRegistrarEtapa>);
+    vi.mocked(useActualizarEtapa).mockReturnValue({
+      mutate: mockActualizarMutate,
+      isPending: false,
+    } as ReturnType<typeof useActualizarEtapa>);
+
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    // No filas: should POST
+    const etapa = makeEtapa('E03', { estado: 'PENDIENTE', es_bucle: false, por_area: false, filas: [] });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    await user.click(screen.getByRole('button', { name: /Marcar E03 como No aplica/i }));
+
+    expect(mockRegistrarMutate).toHaveBeenCalledOnce();
+    expect(mockActualizarMutate).not.toHaveBeenCalled();
+    const [payload] = mockRegistrarMutate.mock.calls[0] as [{ estado_etapa: string }];
+    expect(payload.estado_etapa).toBe('NO_APLICA');
+  });
+
+  it("BUG-6: 'No aplica' click calls useActualizarEtapa (PUT) when etapa already has filas[0]", async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    const mockRegistrarMutate = vi.fn();
+    const mockActualizarMutate = vi.fn();
+    vi.mocked(useRegistrarEtapa).mockReturnValue({
+      mutate: mockRegistrarMutate,
+      isPending: false,
+    } as ReturnType<typeof useRegistrarEtapa>);
+    vi.mocked(useActualizarEtapa).mockReturnValue({
+      mutate: mockActualizarMutate,
+      isPending: false,
+    } as ReturnType<typeof useActualizarEtapa>);
+
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t",
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    // Has existing fila with id=42: should PUT
+    const etapa = makeEtapa('E03', {
+      estado: 'PENDIENTE',
+      es_bucle: false,
+      por_area: false,
+      filas: [{
+        id: 42,
+        area_usuaria: 'OTIN',
+        estado_etapa: 'PENDIENTE',
+        fecha_inicio: null,
+        fecha_fin: null,
+        dias: null,
+      } as FilaArea],
+    });
+
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    await user.click(screen.getByRole('button', { name: /Marcar E03 como No aplica/i }));
+
+    expect(mockActualizarMutate).toHaveBeenCalledOnce();
+    expect(mockRegistrarMutate).not.toHaveBeenCalled();
+    const [callArg] = mockActualizarMutate.mock.calls[0] as [{ etapaId: number; payload: { estado_etapa: string } }];
+    expect(callArg.etapaId).toBe(42);
+    expect(callArg.payload.estado_etapa).toBe('NO_APLICA');
   });
 });

@@ -48,10 +48,13 @@ export function TablaAreasE11({
   areasUsuarias,
   fechaInicioChain = null,
 }: TablaAreasE11Props) {
-  const { mutate: registrar, isPending: isRegistrando } = useRegistrarEtapa(procesoId);
-  const { mutate: actualizar, isPending: isActualizando } = useActualizarEtapa(procesoId);
+  const { mutate: registrar } = useRegistrarEtapa(procesoId);
+  const { mutate: actualizar } = useActualizarEtapa(procesoId);
   const { user } = useAuthStore();
   const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
+
+  // Bug #5 fix: saving state per area instead of a global flag shared by all rows.
+  const [savingArea, setSavingArea] = useState<string | null>(null);
 
   // Local row state for editing
   const [rowState, setRowState] = useState<Record<string, RowState>>(() => {
@@ -90,6 +93,14 @@ export function TablaAreasE11({
 
     if (isNaN(monto) || monto <= 0 || !fecha) return;
 
+    // Bug #5 fix: mark only this area as saving; onSuccess closes only this row.
+    setSavingArea(area);
+    const onDone = () => {
+      setSavingArea(null);
+      setEditing(area, false);
+    };
+    const onError = () => setSavingArea(null);
+
     if (existingFila) {
       actualizar(
         {
@@ -100,7 +111,7 @@ export function TablaAreasE11({
             estado_etapa: 'COMPLETADO',
           },
         },
-        { onSuccess: () => setEditing(area, false) }
+        { onSuccess: onDone, onError }
       );
     } else {
       registrar(
@@ -112,7 +123,7 @@ export function TablaAreasE11({
           area_usuaria: area,
           monto_cert: monto,
         },
-        { onSuccess: () => setEditing(area, false) }
+        { onSuccess: onDone, onError }
       );
     }
   }
@@ -121,30 +132,37 @@ export function TablaAreasE11({
     const existingFila = filas.find((f) => f.area_usuaria === area);
     const hoy = new Date().toISOString().slice(0, 10);
 
+    setSavingArea(area);
+    const onDone = () => setSavingArea(null);
+    const onError = () => setSavingArea(null);
+
     if (existingFila) {
-      actualizar({
-        etapaId: existingFila.id,
-        payload: { estado_etapa: 'NO_APLICA', fecha_inicio: existingFila.fecha_inicio ?? hoy },
-      });
+      actualizar(
+        {
+          etapaId: existingFila.id,
+          payload: { estado_etapa: 'NO_APLICA', fecha_inicio: existingFila.fecha_inicio ?? hoy },
+        },
+        { onSuccess: onDone, onError }
+      );
     } else {
-      registrar({
-        codigo_etapa: 'E11',
-        nombre_etapa: 'Solicitud cert. presupuestal (cada Area - OTIN)',
-        fecha_inicio: hoy,
-        estado_etapa: 'NO_APLICA',
-        area_usuaria: area,
-      });
+      registrar(
+        {
+          codigo_etapa: 'E11',
+          nombre_etapa: 'Solicitud cert. presupuestal (cada Area - OTIN)',
+          fecha_inicio: hoy,
+          estado_etapa: 'NO_APLICA',
+          area_usuaria: area,
+        },
+        { onSuccess: onDone, onError }
+      );
     }
   }
 
-  // Running total from existing filas + local edits that have values
-  const runningTotal = areasUsuarias.reduce((acc, area) => {
-    const montoCert = rowState[area]?.montoCert ?? '';
-    const val = parseFloat(montoCert);
-    return acc + (isNaN(val) ? 0 : val);
+  // Bug #8 fix: running total from confirmed filas only (not unconfirmed local state).
+  const runningTotal = filas.reduce((acc, fila) => {
+    const val = fila.monto_cert ?? 0;
+    return acc + val;
   }, 0);
-
-  const isSaving = isRegistrando || isActualizando;
 
   return (
     <div>
@@ -240,10 +258,11 @@ export function TablaAreasE11({
                         <button
                           type="button"
                           onClick={() => handleSave(area)}
-                          disabled={isSaving}
+                          disabled={savingArea === area}
                           className="text-xs px-2 py-0.5 rounded bg-green-600 text-white disabled:opacity-50"
+                          aria-label={`Guardar ${area}`}
                         >
-                          {isSaving ? '...' : 'Guardar'}
+                          {savingArea === area ? '...' : 'Guardar'}
                         </button>
                         <button
                           type="button"
@@ -265,13 +284,12 @@ export function TablaAreasE11({
                             {fila ? 'Editar' : 'Registrar'}
                           </button>
                         )}
-                        {/* BUG-5: "No aplica" action — available when area is PENDIENTE or to
-                            allow re-toggling from NO_APLICA back (shows as "Reactivar") */}
+                        {/* "No aplica" action — available when area is not NO_APLICA yet */}
                         {!esNoAplica ? (
                           <button
                             type="button"
                             onClick={() => handleNoAplica(area)}
-                            disabled={isSaving}
+                            disabled={savingArea === area}
                             className="text-xs px-2 py-0.5 rounded border border-slate-400 text-slate-600 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
                             aria-label={`Marcar ${area} como No aplica en E11`}
                           >

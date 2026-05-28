@@ -206,4 +206,68 @@ describe("TablaAreasE11", () => {
     // "Editar" button must be present to allow reversing
     expect(screen.getByRole('button', { name: /Editar DTDIS en E11/i })).toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------
+  // Bug #5: savingArea is per-row — guardar A no bloquea B
+  // ---------------------------------------------------------------
+
+  it("BUG-5: while saving area A, Guardar button for area B stays enabled", () => {
+    // Override: mutate for registrar hangs (never calls onSuccess/onError).
+    // This keeps savingArea === 'DTDIS' so we can assert GOBERNANZA is unaffected.
+    mockRegistrar.mockImplementation(() => {
+      // intentionally does nothing — simulates in-flight network request
+    });
+
+    render(
+      React.createElement(TablaAreasE11, {
+        procesoId: 1,
+        filas: [],
+        areasUsuarias: ['DTDIS', 'GOBERNANZA'],
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Open edit mode for DTDIS and fill required fields
+    fireEvent.click(screen.getByRole('button', { name: /Registrar DTDIS/i }));
+    fireEvent.change(screen.getByLabelText(/Monto certificado para DTDIS/i), { target: { value: '50000' } });
+    fireEvent.change(screen.getByLabelText(/Fecha para DTDIS/i), { target: { value: '2026-05-10' } });
+
+    // Trigger save for DTDIS — mutate hangs, so savingArea stays 'DTDIS'
+    fireEvent.click(screen.getByRole('button', { name: /Guardar DTDIS/i }));
+
+    // DTDIS Guardar must be disabled
+    expect(screen.getByRole('button', { name: /Guardar DTDIS/i })).toBeDisabled();
+
+    // Open edit mode for GOBERNANZA — its Guardar must be independent
+    fireEvent.click(screen.getByRole('button', { name: /Registrar GOBERNANZA/i }));
+    expect(screen.getByRole('button', { name: /Guardar GOBERNANZA/i })).not.toBeDisabled();
+  });
+
+  // ---------------------------------------------------------------
+  // Bug #8: runningTotal from filas (confirmed), not rowState (local)
+  // ---------------------------------------------------------------
+
+  it("BUG-8: running total uses confirmed filas, not unconfirmed local input", () => {
+    // Only DTDIS has a confirmed fila (monto_cert=80000). GOBERNANZA is PENDIENTE (no fila).
+    render(
+      React.createElement(TablaAreasE11, {
+        procesoId: 1,
+        filas: [filas[0]!],
+        areasUsuarias: ['DTDIS', 'GOBERNANZA'],
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Initial total should be 80000 (only DTDIS confirmed)
+    expect(screen.getByTestId('e11-total').textContent).toMatch(/80[,.]?000/);
+
+    // User types a monto for GOBERNANZA without saving
+    fireEvent.click(screen.getByRole('button', { name: /Registrar GOBERNANZA/i }));
+    const montoInput = screen.getByLabelText(/Monto certificado para GOBERNANZA/i);
+    fireEvent.change(montoInput, { target: { value: '99999' } });
+
+    // Total must still be 80000 — local state does NOT affect the running total
+    expect(screen.getByTestId('e11-total').textContent).toMatch(/80[,.]?000/);
+    expect(screen.getByTestId('e11-total').textContent).not.toMatch(/179[,.]?999/);
+  });
 });

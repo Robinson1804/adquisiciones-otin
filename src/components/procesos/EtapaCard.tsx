@@ -27,7 +27,7 @@ import { formatFechaCorta } from "@/lib/fecha";
 import { AlertaE16 } from "./AlertaE16";
 import { RondasList } from "./RondasList";
 import { AdjuntosEtapa } from "./AdjuntosEtapa";
-import { useReiniciarTdr, useRegistrarEtapa } from "@/hooks/useEtapas";
+import { useReiniciarTdr, useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 
 // ----------------------------------------------------------------
 // Sub-components
@@ -112,7 +112,9 @@ export function EtapaCard({
   const latestRonda = getLatestRonda(etapa);
 
   // NO_APLICA quick-action
-  const noAplicaMutation = useRegistrarEtapa(procesoId);
+  const noAplicaRegistrar = useRegistrarEtapa(procesoId);
+  const noAplicaActualizar = useActualizarEtapa(procesoId);
+  const noAplicaIsPending = noAplicaRegistrar.isPending || noAplicaActualizar.isPending;
   const [noAplicaError, setNoAplicaError] = React.useState<string | null>(null);
   const puedeMarcarNoAplica =
     puedeEscribir &&
@@ -123,21 +125,34 @@ export function EtapaCard({
   function handleNoAplica() {
     setNoAplicaError(null);
     const hoy = new Date().toISOString().slice(0, 10);
-    noAplicaMutation.mutate(
-      {
-        codigo_etapa: etapa.cod,
-        nombre_etapa: etapa.nombre,
-        fecha_inicio: hoy,
-        estado_etapa: 'NO_APLICA',
-      },
-      {
-        onError: (err) => {
-          const msg = (err as { response?: { data?: { detail?: string } } })
-            ?.response?.data?.detail;
-          setNoAplicaError(msg ?? 'No se pudo marcar como No aplica');
+    const onError = (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail;
+      setNoAplicaError(msg ?? 'No se pudo marcar como No aplica');
+    };
+
+    // Bug #6 fix: if a row already exists (e.g. registered as PENDIENTE), use PUT
+    // to avoid creating a duplicate row.
+    const filaExistente = etapa.filas[0];
+    if (filaExistente) {
+      noAplicaActualizar.mutate(
+        {
+          etapaId: filaExistente.id,
+          payload: { estado_etapa: 'NO_APLICA', fecha_inicio: hoy },
         },
-      }
-    );
+        { onError }
+      );
+    } else {
+      noAplicaRegistrar.mutate(
+        {
+          codigo_etapa: etapa.cod,
+          nombre_etapa: etapa.nombre,
+          fecha_inicio: hoy,
+          estado_etapa: 'NO_APLICA',
+        },
+        { onError }
+      );
+    }
   }
 
   // Estado colors
@@ -329,14 +344,14 @@ export function EtapaCard({
           <div className="mt-2 flex flex-col gap-1">
             <button
               onClick={handleNoAplica}
-              disabled={noAplicaMutation.isPending}
+              disabled={noAplicaIsPending}
               className="text-xs px-2 py-1 rounded border font-medium transition-colors
                          border-slate-300 text-slate-600 bg-slate-50
                          hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed
                          self-start"
               aria-label={`Marcar ${etapa.cod} como No aplica`}
             >
-              {noAplicaMutation.isPending ? 'Guardando...' : 'No aplica'}
+              {noAplicaIsPending ? 'Guardando...' : 'No aplica'}
             </button>
             {noAplicaError && (
               <p className="text-xs text-red-600" role="alert">{noAplicaError}</p>
