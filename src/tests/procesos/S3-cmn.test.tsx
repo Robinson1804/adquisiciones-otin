@@ -1,6 +1,10 @@
 /**
  * T-17 — S3 CMN dynamic section tests.
  * Selecting areas generates matching CMN rows; marking all SI shows green banner.
+ *
+ * NOTE: Section 2 usa el multi-select buscable (AreaSelector).
+ * Los botones de área tienen aria-label="Area {ABREV}" (sin acento en "Area").
+ * Las áreas usadas aquí son DTDIS y OTIN, ambas en DEPENDENCIAS.
  */
 
 import React from "react";
@@ -67,10 +71,10 @@ describe("S3 — CMN dynamic section", () => {
     // Initially no CMN rows (no area selected — placeholder text shown)
     expect(screen.queryByText(/Seleccioná áreas usuarias/i)).toBeInTheDocument();
 
-    // Select DTDIS
-    fireEvent.click(screen.getByRole("button", { name: /Área DTDIS/i }));
-    // Select GOBERNANZA
-    fireEvent.click(screen.getByRole("button", { name: /Área GOBERNANZA/i }));
+    // Select DTDIS via the searchable list
+    fireEvent.click(screen.getByRole("button", { name: /^Area DTDIS$/i }));
+    // Select OTIN via the searchable list
+    fireEvent.click(screen.getByRole("button", { name: /^Area OTIN$/i }));
 
     await waitFor(() => {
       // 2 areas → 2 fieldsets (one per area). Each has 2 radios: SI/NO.
@@ -82,8 +86,8 @@ describe("S3 — CMN dynamic section", () => {
   it("shows green banner when all areas have CMN = SI", async () => {
     render(React.createElement(NuevoProcesoPage), { wrapper: Wrapper });
 
-    // Select DTDIS
-    fireEvent.click(screen.getByRole("button", { name: /Área DTDIS/i }));
+    // Select DTDIS via the searchable list
+    fireEvent.click(screen.getByRole("button", { name: /^Area DTDIS$/i }));
 
     await waitFor(() => {
       // 1 area → 1 "Sin CMN" label
@@ -107,14 +111,14 @@ describe("S3 — CMN dynamic section", () => {
     render(React.createElement(NuevoProcesoPage), { wrapper: Wrapper });
 
     // Select DTDIS
-    fireEvent.click(screen.getByRole("button", { name: /Área DTDIS/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Area DTDIS$/i }));
 
     await waitFor(() => {
       expect(screen.getAllByText(/Sin CMN/i)).toHaveLength(1);
     });
 
-    // Deselect DTDIS
-    fireEvent.click(screen.getByRole("button", { name: /Área DTDIS/i }));
+    // Deselect DTDIS by clicking the toggle button again in the list
+    fireEvent.click(screen.getByRole("button", { name: /^Area DTDIS$/i }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Sin CMN/i)).not.toBeInTheDocument();

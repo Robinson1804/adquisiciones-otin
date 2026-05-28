@@ -113,8 +113,8 @@ describe("S3 — NuevoProcesoPage Zod validation", () => {
     const tipoRadio = screen.getByDisplayValue("BIEN");
     fireEvent.click(tipoRadio);
 
-    // Select area DTDIS
-    const dtdisBtn = screen.getByRole("button", { name: /Área DTDIS/i });
+    // Select area DTDIS via the searchable list (aria-label="Area DTDIS")
+    const dtdisBtn = screen.getByRole("button", { name: /^Area DTDIS$/i });
     fireEvent.click(dtdisBtn);
 
     // Submit

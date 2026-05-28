@@ -4,15 +4,20 @@
  * S3 — Nuevo Proceso (/procesos/nuevo)
  * 4-section form: Identificación / Áreas / CMN / Presupuesto.
  * VIEWER is redirected on mount (role-gate).
+ *
+ * Section 2 usa un multi-select buscable sobre las 39 dependencias INEI.
+ * El valor almacenado en areas_usuarias sigue siendo la abreviatura (string),
+ * compatible con datos existentes.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/stores/authStore";
 import { useCrearProceso } from "@/hooks/useProcesos";
+import { DEPENDENCIAS } from "@/lib/constants";
 
 // ----------------------------------------------------------------
 // Constants
@@ -26,13 +31,6 @@ const TODAY_ISO = (() => {
     d.getDate()
   ).padStart(2, "0")}`;
 })();
-
-const AREAS_VALIDAS = [
-  "DTDIS",
-  "GOBERNANZA",
-  "INFRAESTRUCTURA",
-  "OPERACIONES",
-] as const;
 
 // ----------------------------------------------------------------
 // Zod schema — mirrors ProcesoCreate (backend Pydantic)
@@ -95,6 +93,151 @@ function FieldError({ message }: { message?: string }) {
     <p className="text-xs text-red-600 mt-1" role="alert">
       {message}
     </p>
+  );
+}
+
+// ----------------------------------------------------------------
+// AreaSelector — multi-select buscable sobre DEPENDENCIAS
+// ----------------------------------------------------------------
+interface AreaSelectorProps {
+  seleccionadas: string[];
+  onToggle: (abrev: string) => void;
+}
+
+function AreaSelector({ seleccionadas, onToggle }: AreaSelectorProps) {
+  const [busqueda, setBusqueda] = useState("");
+
+  const termino = busqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? DEPENDENCIAS.filter(
+        (d) =>
+          d.abrev.toLowerCase().includes(termino) ||
+          d.nombre.toLowerCase().includes(termino)
+      )
+    : DEPENDENCIAS;
+
+  return (
+    <div className="space-y-3">
+      {/* Chips de áreas seleccionadas */}
+      {seleccionadas.length > 0 && (
+        <div
+          className="flex flex-wrap gap-1.5"
+          aria-label="Áreas seleccionadas"
+          role="list"
+        >
+          {seleccionadas.map((abrev) => {
+            const dep = DEPENDENCIAS.find((d) => d.abrev === abrev);
+            return (
+              <span
+                key={abrev}
+                role="listitem"
+                className="inline-flex items-center gap-1 bg-primary text-white text-xs font-medium px-2.5 py-1 rounded-full"
+              >
+                {dep?.abrev ?? abrev}
+                <button
+                  type="button"
+                  onClick={() => onToggle(abrev)}
+                  aria-label={`Quitar ${abrev}`}
+                  className="ml-0.5 hover:opacity-75 focus:outline-none focus:ring-1 focus:ring-white rounded-full"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Input de búsqueda */}
+      <input
+        type="search"
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        placeholder="Buscar por abreviatura o nombre..."
+        className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+        aria-label="Buscar dependencia"
+        data-testid="area-search-input"
+      />
+
+      {/* Lista scrolleable de dependencias */}
+      <div
+        className="max-h-56 overflow-y-auto border border-outline rounded divide-y divide-outline"
+        role="group"
+        aria-label="Lista de dependencias"
+      >
+        {filtradas.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-gray-400">
+            Sin resultados para &ldquo;{busqueda}&rdquo;
+          </p>
+        ) : (
+          filtradas.map((dep) => {
+            const selected = seleccionadas.includes(dep.abrev);
+            return (
+              <button
+                key={dep.abrev}
+                type="button"
+                onClick={() => onToggle(dep.abrev)}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
+                  selected
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "hover:bg-surface-content text-gray-700"
+                }`}
+                aria-pressed={selected}
+                aria-label={`Area ${dep.abrev}`}
+              >
+                {/* Checkbox visual */}
+                <span
+                  aria-hidden="true"
+                  className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${
+                    selected
+                      ? "border-primary bg-primary"
+                      : "border-gray-300"
+                  }`}
+                >
+                  {selected && (
+                    <svg
+                      className="w-2.5 h-2.5 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <span className="truncate">{dep.nombre}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {filtradas.length > 0 && (
+        <p className="text-[11px] text-gray-400">
+          {filtradas.length === DEPENDENCIAS.length
+            ? `${DEPENDENCIAS.length} dependencias disponibles`
+            : `${filtradas.length} de ${DEPENDENCIAS.length} dependencias`}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -331,27 +474,10 @@ export default function NuevoProcesoPage() {
             <legend className="text-xs text-gray-500 mb-3">
               Seleccioná las áreas que participan en este proceso (mínimo 1)
             </legend>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Áreas usuarias">
-              {AREAS_VALIDAS.map((area) => {
-                const selected = (areasSeleccionadas ?? []).includes(area);
-                return (
-                  <button
-                    key={area}
-                    type="button"
-                    onClick={() => toggleArea(area)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      selected
-                        ? "bg-primary text-white border-primary"
-                        : "bg-white text-gray-700 border-outline hover:border-primary"
-                    }`}
-                    aria-pressed={selected}
-                    aria-label={`Área ${area}`}
-                  >
-                    {area}
-                  </button>
-                );
-              })}
-            </div>
+            <AreaSelector
+              seleccionadas={areasSeleccionadas ?? []}
+              onToggle={toggleArea}
+            />
             <FieldError message={errors.areas_usuarias?.message} />
           </fieldset>
         </SectionCard>
