@@ -233,13 +233,18 @@ export function ModalRegistroEtapa({
     if (camposExtra.includes('plazo_entrega') && plazoEntrega)
       payload.plazo_entrega = parseInt(plazoEntrega, 10);
 
-    // BUG-2 fix: for bucle stages with an existing ronda, PUT the last ronda
-    // instead of POSTing a new one. This avoids the duplicate-ronda problem where
-    // "Agregar ronda" creates a PENDIENTE row and "Registrar avance" was creating
-    // a second completed row.
+    // Bucle: si ya existe una ronda, ACTUALIZARLA (no insertar otra).
+    // Simple (no bucle, no por-area): si ya hay una fila, ACTUALIZARLA — antes
+    // cada "Registrar avance" duplicaba filas con estados conflictivos.
+    // Por-area: nunca llega aca (retorno temprano arriba — usa TablaAreasE11/E24).
     if (isBucle && lastRonda !== null) {
       actualizar(
         { etapaId: lastRonda.id, payload },
+        { onSuccess: () => onClose() }
+      );
+    } else if (!isBucle && !isPorArea && filaExistente) {
+      actualizar(
+        { etapaId: filaExistente.id, payload },
         { onSuccess: () => onClose() }
       );
     } else {
