@@ -25,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={displayFont.variable}>
-      <body className="bg-surface text-on-surface font-sans antialiased">
+    <html lang="es" className={displayFont.variable} suppressHydrationWarning>
+      <body className="bg-surface text-on-surface font-sans antialiased" suppressHydrationWarning>
         {children}
       </body>
     </html>

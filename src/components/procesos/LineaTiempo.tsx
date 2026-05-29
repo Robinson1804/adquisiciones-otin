@@ -135,26 +135,35 @@ export function LineaTiempo({ procesoId, areasUsuarias = [], procesoEstado }: Li
         })}
       </div>
 
-      {/* Timeline cards */}
+      {/* Timeline cards — Cambio 1: bucles sin rondas ocultos por default */}
       <ol
         className="space-y-2 overflow-y-auto flex-1"
         aria-label="Etapas del proceso en orden"
       >
-        {etapas.map((etapa) => {
-          const actionability = getEtapaActionability(etapa, etapas);
-          return (
-            <li key={etapa.cod}>
-              <EtapaCard
-                etapa={etapa}
-                allEtapas={etapas}
-                procesoId={procesoId}
-                procesoEstado={procesoEstado}
-                actionability={actionability}
-                onRegistrar={() => setModalEtapa(etapa)}
-              />
-            </li>
-          );
-        })}
+        {etapas
+          .filter((etapa) => {
+            if (!etapa.es_bucle) return true;
+            return (etapa.rondas?.length ?? 0) > 0;
+          })
+          .map((etapa) => {
+            const actionability = getEtapaActionability(etapa, etapas);
+            return (
+              <li key={etapa.cod}>
+                <EtapaCard
+                  etapa={etapa}
+                  allEtapas={etapas}
+                  procesoId={procesoId}
+                  procesoEstado={procesoEstado}
+                  actionability={actionability}
+                  onRegistrar={() => setModalEtapa(etapa)}
+                  onActivarBucle={(bucleCod) => {
+                    const bucleEtapa = etapas.find((e) => e.cod === bucleCod);
+                    if (bucleEtapa) setModalEtapa(bucleEtapa);
+                  }}
+                />
+              </li>
+            );
+          })}
       </ol>
 
       {/* Modal registro etapa */}

@@ -231,6 +231,27 @@ export function getFechaInicioSugerida(
   return best;
 }
 
+/**
+ * Cambio 2 — Returns the list of bucle codes that can be "triggered" after a given
+ * chain stage. Used by EtapaCard to render subtle activation buttons.
+ *
+ * Mapping:
+ *  E04  → E05, E06   (observaciones al TDR / corrección TDR)
+ *  E02  → E06b       (solicitud V°B° DTDIS)
+ *  E02b → E06c       (re-firma secuencial post-corrección)
+ *  E08  → E08a, E08b (observaciones a cotizaciones)
+ */
+export const BUCLES_POST_ETAPA: Record<string, string[]> = {
+  E04:  ['E05', 'E06'],
+  E02:  ['E06b'],
+  E02b: ['E06c'],
+  E08:  ['E08a', 'E08b'],
+};
+
+export function getBuclesPostEtapa(cod: string): string[] {
+  return BUCLES_POST_ETAPA[cod] ?? [];
+}
+
 /** Días de demora of a per-area row = (fecha del área − inicio encadenado). */
 export function getDiasDemoraArea(
   fechaArea: string | null | undefined,

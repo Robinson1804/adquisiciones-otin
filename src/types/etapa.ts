@@ -3,6 +3,9 @@
 // Grouped GET contract: Design D4
 // ============================================================
 
+// E01c CMN/SIGA tri-state (backend: 'SI' | 'NO' | 'EN_CURSO' | null)
+export type CmnSigaState = 'SI' | 'NO' | 'EN_CURSO' | null;
+
 export interface FilaArea {
   id: number;
   area_usuaria: string;
@@ -12,7 +15,7 @@ export interface FilaArea {
   dias: number | null;
   // Stage-specific optional fields
   cmn_adjunto?: string;
-  cmn_siga_confirmado?: boolean | null;  // E01c: CMN/SIGA confirmed by area
+  cmn_siga_confirmado?: CmnSigaState;  // E01c: CMN/SIGA confirmed by area (tri-state)
   fecha_limite_respuesta?: string | null; // E01b/E10: deadline for response
   monto_cert?: number;
   resultado_eval?: string;
@@ -33,6 +36,7 @@ export interface RondaBucle {
   id: number;
   nro_ronda: number;
   motivo_bucle: string;
+  titulo_ronda?: string | null;  // Cambio 4: optional round title
   estado_etapa: string;
   fecha_inicio: string | null;
   fecha_fin: string | null;
@@ -108,11 +112,12 @@ export interface EtapaCreatePayload {
   // Per-stage optional fields
   area_usuaria?: string;
   cmn_adjunto?: string;
-  cmn_siga_confirmado?: boolean;  // E01c
+  cmn_siga_confirmado?: CmnSigaState;  // E01c tri-state
   fecha_limite_respuesta?: string; // E01b / E10
   monto_cert?: number;
   resultado_eval?: string;
   motivo_bucle?: string;
+  titulo_ronda?: string | null;  // Cambio 4: optional round title (max 200 chars)
   fecha_envio_otpp?: string;
   fecha_resp_otpp?: string;
   nro_ocs?: string;
@@ -122,6 +127,7 @@ export interface EtapaCreatePayload {
 
 export interface BuclePayload {
   motivo_bucle: string;
+  titulo_ronda?: string | null;  // Cambio 4
 }
 
 // ============================================================

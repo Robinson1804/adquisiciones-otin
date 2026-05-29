@@ -30,6 +30,7 @@ export function RondasList({
   const [expanded, setExpanded] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [motivoBucle, setMotivoBucle] = useState("");
+  const [tituloRonda, setTituloRonda] = useState("");
 
   const { mutate: agregarRonda, isPending } = useAgregarRonda(procesoId);
 
@@ -37,10 +38,18 @@ export function RondasList({
     e.preventDefault();
     if (!motivoBucle.trim()) return;
     agregarRonda(
-      { cod, payload: { motivo_bucle: motivoBucle } },
+      {
+        cod,
+        payload: {
+          motivo_bucle: motivoBucle,
+          // Cambio 4: send null when empty, string when filled
+          titulo_ronda: tituloRonda.trim() || null,
+        },
+      },
       {
         onSuccess: () => {
           setMotivoBucle("");
+          setTituloRonda("");
           setShowAddForm(false);
         },
       }
@@ -80,7 +89,10 @@ export function RondasList({
                   className="font-semibold"
                   style={{ color: COLORES_ACTOR.BUCLE.text }}
                 >
-                  Ronda {ronda.nro_ronda}
+                  {/* Cambio 4: show title if present */}
+                  {ronda.titulo_ronda
+                    ? `Ronda ${ronda.nro_ronda} — ${ronda.titulo_ronda}`
+                    : `Ronda ${ronda.nro_ronda}`}
                 </span>
                 <span
                   className="px-1.5 py-0.5 rounded text-xs"
@@ -147,6 +159,16 @@ export function RondasList({
           className="mt-1 flex flex-col gap-1"
           aria-label={`Formulario agregar ronda ${cod}`}
         >
+          {/* Cambio 4: optional titulo_ronda */}
+          <input
+            type="text"
+            value={tituloRonda}
+            onChange={(e) => setTituloRonda(e.target.value)}
+            placeholder="Título de la ronda (opcional)..."
+            maxLength={200}
+            className="text-xs border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:ring-1 focus:ring-yellow-400"
+            aria-label="Título de la ronda"
+          />
           <textarea
             rows={2}
             value={motivoBucle}
@@ -166,7 +188,7 @@ export function RondasList({
             </button>
             <button
               type="button"
-              onClick={() => { setShowAddForm(false); setMotivoBucle(""); }}
+              onClick={() => { setShowAddForm(false); setMotivoBucle(""); setTituloRonda(""); }}
               className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-600"
             >
               Cancelar

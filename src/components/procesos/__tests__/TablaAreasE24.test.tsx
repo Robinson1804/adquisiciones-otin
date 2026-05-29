@@ -178,6 +178,89 @@ describe("TablaAreasE24 — codigoEtapa='E01'", () => {
   });
 });
 
+// ---------------------------------------------------------------
+// Cambio 6 — CMN tri-estado en E01c (SI / NO / EN_CURSO)
+// ---------------------------------------------------------------
+describe("TablaAreasE24 — codigoEtapa='E01c' CMN tri-estado", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("Cambio-6: CMN select has SI, NO, EN_CURSO options (not boolean)", () => {
+    render(
+      React.createElement(TablaAreasE24, {
+        procesoId: 1,
+        filas: [],
+        areasUsuarias: ["CIDE"],
+        codigoEtapa: "E01c",
+      }),
+      { wrapper: Wrapper }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Editar conformidad CIDE/i }));
+
+    const select = screen.getByRole("combobox", { name: /CMN para CIDE/i });
+    expect(select).toBeInTheDocument();
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(options).toContain("SI");
+    expect(options).toContain("NO");
+    expect(options).toContain("EN_CURSO");
+  });
+
+  it("Cambio-6: shows cmn_siga_confirmado value in read mode", () => {
+    const filaConCmn = {
+      id: 5,
+      area_usuaria: "CIDE",
+      estado_etapa: "COMPLETADO",
+      fecha_inicio: "2026-05-01",
+      fecha_fin: null,
+      dias: null,
+      cmn_siga_confirmado: "EN_CURSO" as const,
+    };
+
+    render(
+      React.createElement(TablaAreasE24, {
+        procesoId: 1,
+        filas: [filaConCmn],
+        areasUsuarias: ["CIDE"],
+        codigoEtapa: "E01c",
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByText("EN_CURSO")).toBeInTheDocument();
+  });
+
+  it("Cambio-6: includes cmn_siga_confirmado in payload for E01c", () => {
+    render(
+      React.createElement(TablaAreasE24, {
+        procesoId: 1,
+        filas: [],
+        areasUsuarias: ["CIDE"],
+        codigoEtapa: "E01c",
+        nombreEtapa: "Respuesta área con requerimiento + CMN/SIGA",
+        fechaLabel: "Fecha de solicitud",
+      }),
+      { wrapper: Wrapper }
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Editar conformidad CIDE/i }));
+
+    const dateInput = screen.getByLabelText(/Fecha de solicitud para CIDE/i);
+    fireEvent.change(dateInput, { target: { value: "2026-05-10" } });
+
+    const select = screen.getByRole("combobox", { name: /CMN para CIDE/i });
+    fireEvent.change(select, { target: { value: "EN_CURSO" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Guardar/i }));
+
+    expect(mockRegistrar).toHaveBeenCalledOnce();
+    const [callArgs] = mockRegistrar.mock.calls;
+    expect(callArgs[0].cmn_siga_confirmado).toBe("EN_CURSO");
+    expect(callArgs[0].cmn_adjunto).toBeUndefined();
+  });
+});
+
 describe("TablaAreasE24 — codigoEtapa='E24' (default)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

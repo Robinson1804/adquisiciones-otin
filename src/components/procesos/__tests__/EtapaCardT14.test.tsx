@@ -143,7 +143,8 @@ describe("T14 — EtapaCard new variants (flujo-real-otin-v2)", () => {
   // E01c: cmn_siga_confirmado per-area badge
   // ---------------------------------------------------------------
 
-  it("E01c shows cmn_siga_confirmado badge (SI/NO) per area in filas", () => {
+  // Cambio 6: cmn_siga_confirmado is now tri-state ('SI' | 'NO' | 'EN_CURSO' | null)
+  it("E01c shows cmn_siga_confirmado badge per area in filas (tri-state)", () => {
     const etapa = makeEtapa("E01c", {
       area_responsable: "AREAS",
       por_area: true,
@@ -156,7 +157,7 @@ describe("T14 — EtapaCard new variants (flujo-real-otin-v2)", () => {
           fecha_inicio: "2026-01-05",
           fecha_fin: null,
           dias: null,
-          cmn_siga_confirmado: true,
+          cmn_siga_confirmado: "SI",
         } as FilaArea,
         {
           id: 21,
@@ -165,7 +166,7 @@ describe("T14 — EtapaCard new variants (flujo-real-otin-v2)", () => {
           fecha_inicio: null,
           fecha_fin: null,
           dias: null,
-          cmn_siga_confirmado: false,
+          cmn_siga_confirmado: "NO",
         } as FilaArea,
       ],
     });
@@ -181,8 +182,9 @@ describe("T14 — EtapaCard new variants (flujo-real-otin-v2)", () => {
       { wrapper: Wrapper }
     );
 
-    // Should show SI/NO CMN badges in the per-area summary
-    expect(screen.getByText(/CMN.*SI|SI.*CMN/i)).toBeInTheDocument();
+    // Should show SI badge (green) and NO badge (red) in per-area summary
+    expect(screen.getByText(/DTDIS: CMN SI/i)).toBeInTheDocument();
+    expect(screen.getByText(/GOBERNANZA: CMN NO/i)).toBeInTheDocument();
   });
 
   // ---------------------------------------------------------------

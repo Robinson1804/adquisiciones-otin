@@ -10,7 +10,7 @@
  */
 
 import React, { useState } from "react";
-import type { FilaArea } from "@/types/etapa";
+import type { FilaArea, CmnSigaState } from "@/types/etapa";
 import { useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 import { useAuthStore } from "@/stores/authStore";
 import { COLORES_ESTADO } from "@/lib/constants";
@@ -33,7 +33,7 @@ interface TablaAreasE24Props {
 
 interface RowState {
   fecha: string;
-  cmn: string;
+  cmn: string;          // cmn_adjunto for E01/cmn_siga_confirmado for E01c
   editing: boolean;
 }
 
@@ -53,14 +53,20 @@ export function TablaAreasE24({
 
   // flujo-real-otin-v2: E01 removed; E01c is the area-level requerimiento stage
   const isE01 = codigoEtapa === "E01" || codigoEtapa === "E01c";
+  // Cambio 6: E01c uses cmn_siga_confirmado (tri-state), E01 uses cmn_adjunto (string)
+  const isE01c = codigoEtapa === "E01c";
 
   const [rowState, setRowState] = useState<Record<string, RowState>>(() => {
     const state: Record<string, RowState> = {};
     for (const area of areasUsuarias) {
       const fila = filas.find((f) => f.area_usuaria === area);
+      // Cambio 6: E01c uses cmn_siga_confirmado (tri-state); E01 uses cmn_adjunto
+      const cmnValue = isE01c
+        ? (fila?.cmn_siga_confirmado ?? 'NO')
+        : (fila?.cmn_adjunto ?? 'NO');
       state[area] = {
         fecha: fila?.fecha_inicio ?? '',
-        cmn: fila?.cmn_adjunto ?? 'NO',
+        cmn: cmnValue as string,
         editing: false,
       };
     }
@@ -95,6 +101,13 @@ export function TablaAreasE24({
 
     const cmn = rowState[area]?.cmn ?? 'NO';
 
+    // Cambio 6: E01c sends cmn_siga_confirmado (tri-state); E01 (legacy) sends cmn_adjunto
+    const cmnPayload = isE01c
+      ? { cmn_siga_confirmado: cmn as CmnSigaState }
+      : isE01
+        ? { cmn_adjunto: cmn }
+        : {};
+
     if (existingFila) {
       actualizar(
         {
@@ -102,7 +115,7 @@ export function TablaAreasE24({
           payload: {
             fecha_inicio: fecha,
             estado_etapa: 'COMPLETADO',
-            ...(isE01 ? { cmn_adjunto: cmn } : {}),
+            ...cmnPayload,
           },
         },
         { onSuccess: () => setEditing(area, false) }
@@ -115,7 +128,7 @@ export function TablaAreasE24({
           fecha_inicio: fecha,
           estado_etapa: 'COMPLETADO',
           area_usuaria: area,
-          ...(isE01 ? { cmn_adjunto: cmn } : {}),
+          ...cmnPayload,
         },
         { onSuccess: () => setEditing(area, false) }
       );
@@ -199,10 +212,19 @@ export function TablaAreasE24({
                         >
                           <option value="SI">SI</option>
                           <option value="NO">NO</option>
-                          <option value="PENDIENTE">PENDIENTE</option>
+                          {/* Cambio 6: E01c uses tri-state; E01 (legacy) uses PENDIENTE */}
+                          {isE01c ? (
+                            <option value="EN_CURSO">EN_CURSO</option>
+                          ) : (
+                            <option value="PENDIENTE">PENDIENTE</option>
+                          )}
                         </select>
                       ) : (
-                        <span>{fila?.cmn_adjunto ?? '—'}</span>
+                        <span>
+                          {isE01c
+                            ? (fila?.cmn_siga_confirmado ?? '—')
+                            : (fila?.cmn_adjunto ?? '—')}
+                        </span>
                       )}
                     </td>
                   )}

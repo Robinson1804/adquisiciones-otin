@@ -22,7 +22,7 @@ import { COLORES_ACTOR, COLORES_ESTADO, CODIGOS_CON_ADJUNTOS } from "@/lib/const
 import { useAuthStore } from "@/stores/authStore";
 import type { EtapaAgrupada } from "@/types/etapa";
 import type { EtapaActionability } from "@/lib/etapaRules";
-import { getLatestRonda } from "@/lib/etapaRules";
+import { getLatestRonda, getBuclesPostEtapa } from "@/lib/etapaRules";
 import { formatFechaCorta } from "@/lib/fecha";
 import { AlertaE16 } from "./AlertaE16";
 import { RondasList } from "./RondasList";
@@ -85,6 +85,8 @@ interface EtapaCardProps {
   procesoEstado?: string;
   actionability: EtapaActionability;
   onRegistrar: () => void;
+  /** Cambio 2: called when user clicks an "activate bucle" button; receives the bucle cod */
+  onActivarBucle?: (bucleCod: string) => void;
 }
 
 export function EtapaCard({
@@ -94,6 +96,7 @@ export function EtapaCard({
   procesoEstado,
   actionability,
   onRegistrar,
+  onActivarBucle,
 }: EtapaCardProps) {
   const { user } = useAuthStore();
   const puedeEscribir = user?.rol === 'ADMIN' || user?.rol === 'EDITOR';
@@ -222,6 +225,18 @@ export function EtapaCard({
               <span className="text-sm font-semibold text-gray-800 truncate">
                 {etapa.nombre}
               </span>
+              {/* Cambio 5 — Tooltip DTDIS en E06b */}
+              {etapa.cod === 'E06b' && (
+                <span
+                  data-testid="dtdis-tooltip"
+                  title="DTDIS = Dirección de Tecnologías Digitales de Información y Servicios del INEI. Aplica cuando el bien/servicio requiere V°B° técnico especializado."
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-100 text-blue-600 text-xs font-bold cursor-help select-none flex-shrink-0"
+                  aria-label="DTDIS: información sobre este organismo"
+                  role="img"
+                >
+                  i
+                </span>
+              )}
             </div>
 
             {/* Row 2: state pill + ronda badge + E16 alerta */}
@@ -268,22 +283,31 @@ export function EtapaCard({
               );
             })()}
 
-            {/* E01c: cmn_siga_confirmado per-area summary */}
+            {/* Cambio 6 — E01c: cmn_siga_confirmado tri-state per-area summary */}
             {etapa.cod === 'E01c' && etapa.filas.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
-                {etapa.filas.map((fila) => (
-                  <span
-                    key={fila.area_usuaria}
-                    className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                      fila.cmn_siga_confirmado === true
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}
-                    aria-label={`CMN ${fila.area_usuaria}: ${fila.cmn_siga_confirmado ? 'SI' : 'NO'}`}
-                  >
-                    {fila.area_usuaria}: CMN {fila.cmn_siga_confirmado ? 'SI' : 'NO'}
-                  </span>
-                ))}
+                {etapa.filas.map((fila) => {
+                  const cmn = fila.cmn_siga_confirmado;
+                  const badgeClass =
+                    cmn === 'SI'       ? 'bg-green-100 text-green-700' :
+                    cmn === 'NO'       ? 'bg-red-100 text-red-700' :
+                    cmn === 'EN_CURSO' ? 'bg-yellow-100 text-yellow-700' :
+                                         'bg-gray-100 text-gray-500';
+                  const label =
+                    cmn === 'SI'       ? 'SI' :
+                    cmn === 'NO'       ? 'NO' :
+                    cmn === 'EN_CURSO' ? 'EN CURSO' :
+                                         '—';
+                  return (
+                    <span
+                      key={fila.area_usuaria}
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${badgeClass}`}
+                      aria-label={`CMN ${fila.area_usuaria}: ${label}`}
+                    >
+                      {fila.area_usuaria}: CMN {label}
+                    </span>
+                  );
+                })}
               </div>
             )}
 
@@ -402,6 +426,58 @@ export function EtapaCard({
             )}
           </div>
         )}
+
+        {/* Cambio 2 — Botones inline para activar bucles */}
+        {puedeEscribir && (() => {
+          const buclesCods = getBuclesPostEtapa(etapa.cod);
+          if (buclesCods.length === 0) return null;
+
+          // Button config per bucle code
+          const BUCLE_LABELS: Record<string, string> = {
+            E05: '+ Hubo observaciones al TDR',
+            E06: '+ Hubo observaciones al TDR',
+            E06b: '+ Solicitar V°B° de DTDIS',
+            E06c: '+ Re-firmar áreas tras corrección',
+            E08a: '+ Hubo observaciones a cotizaciones',
+            E08b: '+ Hubo observaciones a cotizaciones',
+          };
+
+          const buttonsToShow = buclesCods.filter((bCod) => {
+            const bucleEtapa = allEtapas.find((e) => e.cod === bCod);
+            // Only show if the bucle has NO rondas yet
+            return bucleEtapa && (bucleEtapa.rondas?.length ?? 0) === 0;
+          });
+
+          if (buttonsToShow.length === 0) return null;
+
+          // Deduplicate by label (E05+E06 share the same label)
+          const seen = new Set<string>();
+          const uniqueButtons = buttonsToShow.filter((bCod) => {
+            const lbl = BUCLE_LABELS[bCod] ?? bCod;
+            if (seen.has(lbl)) return false;
+            seen.add(lbl);
+            return true;
+          });
+
+          return (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {uniqueButtons.map((bCod) => (
+                <button
+                  key={bCod}
+                  type="button"
+                  onClick={() => onActivarBucle?.(bCod)}
+                  data-bucle-cod={bCod}
+                  className="text-xs px-2 py-0.5 rounded border font-medium transition-colors
+                             border-slate-300 text-slate-500 bg-white hover:bg-slate-50
+                             hover:border-slate-400"
+                  aria-label={BUCLE_LABELS[bCod] ?? bCod}
+                >
+                  {BUCLE_LABELS[bCod] ?? bCod}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* WU-F3: Reiniciar TDR */}
         {puedeEscribir && esCanceladoPorSinPresupuesto && (

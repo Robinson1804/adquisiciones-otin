@@ -457,6 +457,281 @@ describe("EtapaCard", () => {
     expect(screen.queryByRole('button', { name: /Marcar E10 como No aplica/i })).not.toBeInTheDocument();
   });
 
+  // ---------------------------------------------------------------
+  // Cambio 3 — NO badge "BUCLE" adicional (solo actor chip y código)
+  // ---------------------------------------------------------------
+
+  it("Cambio-3: bucle stage E05 does NOT render a standalone orange BUCLE badge (only actor chip allowed)", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null, token: null, isAuthenticated: false, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E05', { es_bucle: true, area_responsable: 'BUCLE' });
+    const { container } = render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // There should be at most ONE element with text "BUCLE" (the actor chip),
+    // NOT an additional badge with the BUCLE background color (#FFE699)
+    // and explicit "BUCLE" text as a separate badge element.
+    const allBucleTexts = Array.from(container.querySelectorAll('span')).filter(
+      (el) => el.textContent?.trim() === 'BUCLE' &&
+               el.getAttribute('data-testid') !== 'actor-chip'
+    );
+    expect(allBucleTexts).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------
+  // Cambio 2 — Botones inline para activar bucle
+  // ---------------------------------------------------------------
+
+  it("Cambio-2: E04 card shows '+ Hubo observaciones al TDR' when E05 has no rondas", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t", isAuthenticated: true, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const e04 = makeEtapa('E04', { estado: 'COMPLETADO', area_responsable: 'OTA' });
+    const e05 = makeEtapa('E05', { es_bucle: true, rondas: [] });
+    render(
+      React.createElement(EtapaCard, {
+        etapa: e04,
+        allEtapas: [e04, e05],
+        procesoId: 1,
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByRole('button', { name: /Hubo observaciones al TDR/i })).toBeInTheDocument();
+  });
+
+  it("Cambio-2: E04 card does NOT show activate button when E05 already has rondas", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t", isAuthenticated: true, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const e04 = makeEtapa('E04', { estado: 'COMPLETADO', area_responsable: 'OTA' });
+    const e05 = makeEtapa('E05', {
+      es_bucle: true,
+      rondas: [{ id: 1, nro_ronda: 1, motivo_bucle: 'obs', estado_etapa: 'COMPLETADO', fecha_inicio: null, fecha_fin: null, dias: null }],
+    });
+    render(
+      React.createElement(EtapaCard, {
+        etapa: e04,
+        allEtapas: [e04, e05],
+        procesoId: 1,
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /Hubo observaciones al TDR/i })).not.toBeInTheDocument();
+  });
+
+  it("Cambio-2: E02b card shows '+ Re-firmar áreas tras corrección' when E06c has no rondas", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 1, username: "editor", nombre_completo: "Editor", rol: "EDITOR", area: null },
+      token: "t", isAuthenticated: true, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const e02b = makeEtapa('E02b', { estado: 'COMPLETADO', area_responsable: 'AREAS' });
+    const e06c = makeEtapa('E06c', { es_bucle: true, rondas: [] });
+    render(
+      React.createElement(EtapaCard, {
+        etapa: e02b,
+        allEtapas: [e02b, e06c],
+        procesoId: 1,
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByRole('button', { name: /Re-firmar áreas tras corrección/i })).toBeInTheDocument();
+  });
+
+  it("Cambio-2: VIEWER does NOT see bucle activation buttons", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: { id: 2, username: "viewer", nombre_completo: "Viewer", rol: "VIEWER", area: null },
+      token: "t", isAuthenticated: true, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const e04 = makeEtapa('E04', { estado: 'COMPLETADO', area_responsable: 'OTA' });
+    const e05 = makeEtapa('E05', { es_bucle: true, rondas: [] });
+    render(
+      React.createElement(EtapaCard, {
+        etapa: e04,
+        allEtapas: [e04, e05],
+        procesoId: 1,
+        actionability: { canRegister: false, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.queryByRole('button', { name: /Hubo observaciones/i })).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------
+  // Cambio 5 — Tooltip DTDIS en E06b
+  // ---------------------------------------------------------------
+
+  it("Cambio-5: E06b card has DTDIS tooltip info element", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null, token: null, isAuthenticated: false, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E06b', { es_bucle: true, area_responsable: 'BUCLE' });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // The DTDIS tooltip element is rendered with data-testid="dtdis-tooltip"
+    const tooltip = screen.getByTestId('dtdis-tooltip');
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip).toHaveAttribute('title');
+    const title = tooltip.getAttribute('title') ?? '';
+    expect(title).toMatch(/DTDIS/i);
+  });
+
+  // ---------------------------------------------------------------
+  // Cambio 6 — CMN tri-estado en E01c
+  // ---------------------------------------------------------------
+
+  it("Cambio-6: E01c card shows badge 'CMN SI' in green for SI", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null, token: null, isAuthenticated: false, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E01c', {
+      por_area: true,
+      filas: [{
+        id: 1, area_usuaria: 'CIDE', estado_etapa: 'COMPLETADO',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        cmn_siga_confirmado: 'SI',
+      } as FilaArea],
+    });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    const badge = screen.getByText(/CIDE: CMN SI/i);
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('bg-green-100');
+  });
+
+  it("Cambio-6: E01c card shows badge 'CMN NO' in red for NO", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null, token: null, isAuthenticated: false, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E01c', {
+      por_area: true,
+      filas: [{
+        id: 2, area_usuaria: 'DNCE', estado_etapa: 'COMPLETADO',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        cmn_siga_confirmado: 'NO',
+      } as FilaArea],
+    });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    const badge = screen.getByText(/DNCE: CMN NO/i);
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('bg-red-100');
+  });
+
+  it("Cambio-6: E01c card shows badge 'CMN EN CURSO' in yellow for EN_CURSO", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null, token: null, isAuthenticated: false, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E01c', {
+      por_area: true,
+      filas: [{
+        id: 3, area_usuaria: 'DTIE', estado_etapa: 'EN_CURSO',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        cmn_siga_confirmado: 'EN_CURSO',
+      } as FilaArea],
+    });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    const badge = screen.getByText(/DTIE: CMN EN CURSO/i);
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('bg-yellow-100');
+  });
+
+  it("Cambio-6: E01c card shows badge 'CMN —' in gray for null", () => {
+    vi.mocked(useAuthStore).mockReturnValue({
+      user: null, token: null, isAuthenticated: false, login: vi.fn(), logout: vi.fn(),
+    } as ReturnType<typeof useAuthStore>);
+
+    const etapa = makeEtapa('E01c', {
+      por_area: true,
+      filas: [{
+        id: 4, area_usuaria: 'OTD', estado_etapa: 'PENDIENTE',
+        fecha_inicio: null, fecha_fin: null, dias: null,
+        cmn_siga_confirmado: null,
+      } as FilaArea],
+    });
+    render(
+      React.createElement(EtapaCard, {
+        etapa,
+        allEtapas: [etapa],
+        procesoId: 1,
+        actionability: { canRegister: true, blockedReason: null },
+        onRegistrar: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    const badge = screen.getByText(/OTD: CMN —/i);
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('bg-gray-100');
+  });
+
   it("card has neutral background — actor color no longer set as inline bg on card", () => {
     vi.mocked(useAuthStore).mockReturnValue({
       user: null,

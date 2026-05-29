@@ -87,7 +87,9 @@ describe("LineaTiempo", () => {
     vi.clearAllMocks();
   });
 
-  it("renders 32 etapa cards in order (flujo-real-otin-v2)", () => {
+  // Cambio 1: bucle stages with no rondas are hidden → 26 non-bucle + 0 bucle = 26 visible
+  // (32 total - 6 bucles sin rondas: E05, E06, E06b, E06c, E08a, E08b)
+  it("renders 26 visible etapa cards when all bucles have no rondas (flujo-real-otin-v2)", () => {
     vi.mocked(useEtapas).mockReturnValue({
       data: allPendingResponse,
       isLoading: false,
@@ -98,10 +100,10 @@ describe("LineaTiempo", () => {
     render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
 
     const cards = screen.getAllByRole('article');
-    expect(cards).toHaveLength(32);
+    expect(cards).toHaveLength(26);
   });
 
-  it("renders all 32 etapa codes as article labels (flujo-real-otin-v2)", () => {
+  it("renders all non-bucle etapa codes as article labels (flujo-real-otin-v2)", () => {
     vi.mocked(useEtapas).mockReturnValue({
       data: allPendingResponse,
       isLoading: false,
@@ -111,8 +113,14 @@ describe("LineaTiempo", () => {
 
     render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
 
-    for (const cod of ETAPA_CODES) {
+    const BUCLE_CODES = ['E05','E06','E06b','E06c','E08a','E08b'];
+    const nonBucleCodes = ETAPA_CODES.filter((cod) => !BUCLE_CODES.includes(cod));
+    for (const cod of nonBucleCodes) {
       expect(screen.getByTestId(`etapa-card-${cod}`)).toBeInTheDocument();
+    }
+    // Bucle codes with no rondas should be absent
+    for (const cod of BUCLE_CODES) {
+      expect(screen.queryByTestId(`etapa-card-${cod}`)).not.toBeInTheDocument();
     }
   });
 
@@ -171,6 +179,71 @@ describe("LineaTiempo", () => {
     const chip = e01aCard.querySelector('[data-testid="actor-chip"]');
     expect(chip).toBeInTheDocument();
     expect(chip).toHaveTextContent('AREAS');
+  });
+
+  // ---------------------------------------------------------------
+  // Cambio 1 — Bucles ocultos por default
+  // ---------------------------------------------------------------
+
+  it("Cambio-1: bucle stage with no rondas is NOT rendered in the timeline", () => {
+    // All bucle stages have rondas: [], so they should be hidden
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    // E05, E06, E06b, E06c, E08a, E08b all have rondas:[] → should NOT appear
+    expect(screen.queryByTestId('etapa-card-E05')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('etapa-card-E06')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('etapa-card-E06b')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('etapa-card-E06c')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('etapa-card-E08a')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('etapa-card-E08b')).not.toBeInTheDocument();
+  });
+
+  it("Cambio-1: bucle stage WITH rondas IS rendered in the timeline", () => {
+    const responseWithE05Ronda: EtapasResponse = {
+      ...allPendingResponse,
+      etapas: allPendingResponse.etapas.map((e) =>
+        e.cod === 'E05'
+          ? { ...e, rondas: [{ id: 1, nro_ronda: 1, motivo_bucle: 'obs', estado_etapa: 'EN_CURSO', fecha_inicio: null, fecha_fin: null, dias: null }] }
+          : e
+      ),
+    };
+
+    vi.mocked(useEtapas).mockReturnValue({
+      data: responseWithE05Ronda,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    expect(screen.getByTestId('etapa-card-E05')).toBeInTheDocument();
+    // E06 still has no rondas → still hidden
+    expect(screen.queryByTestId('etapa-card-E06')).not.toBeInTheDocument();
+  });
+
+  it("Cambio-1: non-bucle stages always render regardless of filas", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    // Non-bucle stages should always be present
+    expect(screen.getByTestId('etapa-card-E01a')).toBeInTheDocument();
+    expect(screen.getByTestId('etapa-card-E04')).toBeInTheDocument();
+    expect(screen.getByTestId('etapa-card-E08')).toBeInTheDocument();
+    expect(screen.getByTestId('etapa-card-E25')).toBeInTheDocument();
   });
 
   it("shows loading skeleton when isLoading", () => {
