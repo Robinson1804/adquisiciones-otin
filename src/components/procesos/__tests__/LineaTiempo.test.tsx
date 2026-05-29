@@ -43,8 +43,10 @@ vi.mock("@/components/procesos/AdjuntosEtapa", () => ({
 
 import { useEtapas } from "@/hooks/useEtapas";
 
+// flujo-real-otin-v2: 32 etapas — E01 removed, E01a/E01b/E01c/E02b/E06c added
 const ETAPA_CODES = [
-  'E01','E02','E03','E04','E05','E06','E06b','E07','E08','E08a','E08b',
+  'E01a','E01b','E01c','E02','E02b',
+  'E03','E04','E05','E06','E06b','E06c','E07','E08','E08a','E08b',
   'E09','E10','E11','E12','E13','E14','E15','E16','E17','E18',
   'E19','E20','E21','E22','E23','E24','E25',
 ];
@@ -54,8 +56,8 @@ function makeEtapa(cod: string, area = 'OTIN', overrides = {}) {
     cod,
     nombre: `Etapa ${cod}`,
     area_responsable: area,
-    es_bucle: ['E05','E06','E06b','E08a','E08b'].includes(cod),
-    por_area: ['E01','E11','E24'].includes(cod),
+    es_bucle: ['E05','E06','E06b','E06c','E08a','E08b'].includes(cod),
+    por_area: ['E01c','E11','E24'].includes(cod),
     estado: 'PENDIENTE',
     filas: [],
     rondas: [],
@@ -68,10 +70,10 @@ function makeEtapa(cod: string, area = 'OTIN', overrides = {}) {
 const allPendingResponse: EtapasResponse = {
   etapas: ETAPA_CODES.map((cod) => makeEtapa(cod)),
   progreso: {
-    etapa_actual: 'E01',
+    etapa_actual: 'E01a',
     porcentaje: 0,
     completadas: 0,
-    total: 25,
+    total: 26,
   },
 };
 
@@ -85,7 +87,7 @@ describe("LineaTiempo", () => {
     vi.clearAllMocks();
   });
 
-  it("renders 28 etapa cards in order", () => {
+  it("renders 32 etapa cards in order (flujo-real-otin-v2)", () => {
     vi.mocked(useEtapas).mockReturnValue({
       data: allPendingResponse,
       isLoading: false,
@@ -96,10 +98,10 @@ describe("LineaTiempo", () => {
     render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
 
     const cards = screen.getAllByRole('article');
-    expect(cards).toHaveLength(28);
+    expect(cards).toHaveLength(32);
   });
 
-  it("renders all 28 etapa codes as article labels", () => {
+  it("renders all 32 etapa codes as article labels (flujo-real-otin-v2)", () => {
     vi.mocked(useEtapas).mockReturnValue({
       data: allPendingResponse,
       isLoading: false,
@@ -144,11 +146,11 @@ describe("LineaTiempo", () => {
     expect(screen.getByText('Ronda 2')).toBeInTheDocument();
   });
 
-  it("AREAS actor chip is rendered inside the E01 card (actor color in chip, not card bg)", () => {
+  it("AREAS actor chip is rendered inside the E01a card (actor color in chip, not card bg)", () => {
     const responseWithAreas: EtapasResponse = {
       ...allPendingResponse,
       etapas: allPendingResponse.etapas.map((e) =>
-        e.cod === 'E01' ? { ...e, area_responsable: 'AREAS' } : e
+        e.cod === 'E01a' ? { ...e, area_responsable: 'AREAS' } : e
       ),
     };
 
@@ -162,11 +164,11 @@ describe("LineaTiempo", () => {
     render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
 
     // Card no longer has actor bg as inline style — actor color lives in the chip only
-    const e01Card = screen.getByTestId('etapa-card-E01');
-    expect(e01Card).not.toHaveStyle({ backgroundColor: COLORES_ACTOR.AREAS.bg });
+    const e01aCard = screen.getByTestId('etapa-card-E01a');
+    expect(e01aCard).not.toHaveStyle({ backgroundColor: COLORES_ACTOR.AREAS.bg });
 
-    // Actor chip inside E01 card shows "AREAS" label
-    const chip = e01Card.querySelector('[data-testid="actor-chip"]');
+    // Actor chip inside E01a card shows "AREAS" label
+    const chip = e01aCard.querySelector('[data-testid="actor-chip"]');
     expect(chip).toBeInTheDocument();
     expect(chip).toHaveTextContent('AREAS');
   });

@@ -27,6 +27,7 @@ import { formatFechaCorta } from "@/lib/fecha";
 import { AlertaE16 } from "./AlertaE16";
 import { RondasList } from "./RondasList";
 import { AdjuntosEtapa } from "./AdjuntosEtapa";
+import { FirmaSecuencialPanel } from "./FirmaSecuencialPanel";
 import { useReiniciarTdr, useRegistrarEtapa, useActualizarEtapa } from "@/hooks/useEtapas";
 
 // ----------------------------------------------------------------
@@ -243,6 +244,49 @@ export function EtapaCard({
               )}
             </div>
 
+            {/* E01b: fecha_limite_respuesta countdown badge */}
+            {etapa.cod === 'E01b' && primeraFila?.fecha_limite_respuesta && (() => {
+              const limite = new Date(primeraFila.fecha_limite_respuesta);
+              const hoy = new Date();
+              hoy.setHours(0, 0, 0, 0);
+              const diasRestantes = Math.ceil((limite.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+              return (
+                <div
+                  className={`text-xs font-semibold px-2 py-0.5 rounded-full self-start ${
+                    diasRestantes <= 0
+                      ? 'bg-red-100 text-red-700'
+                      : diasRestantes <= 3
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-blue-100 text-blue-700'
+                  }`}
+                  aria-label={`Fecha límite de respuesta: ${diasRestantes} días`}
+                >
+                  {diasRestantes <= 0
+                    ? 'Vence hoy / Vencido'
+                    : `Vence en ${diasRestantes} días`}
+                </div>
+              );
+            })()}
+
+            {/* E01c: cmn_siga_confirmado per-area summary */}
+            {etapa.cod === 'E01c' && etapa.filas.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {etapa.filas.map((fila) => (
+                  <span
+                    key={fila.area_usuaria}
+                    className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      fila.cmn_siga_confirmado === true
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}
+                    aria-label={`CMN ${fila.area_usuaria}: ${fila.cmn_siga_confirmado ? 'SI' : 'NO'}`}
+                  >
+                    {fila.area_usuaria}: CMN {fila.cmn_siga_confirmado ? 'SI' : 'NO'}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* E21: inicio del plazo */}
             {etapa.cod === 'E21' && etapa.estado === 'COMPLETADO' && (
               <div
@@ -397,6 +441,20 @@ export function EtapaCard({
               cod={etapa.cod}
               canAddRonda={actionability.canRegister && puedeEscribir}
               blockedReason={actionability.blockedReason}
+            />
+          </div>
+        )}
+
+        {/* E02b / E06c: FirmaSecuencialPanel — sequential signing */}
+        {(etapa.cod === 'E02b' || etapa.cod === 'E06c') && (
+          <div className="mt-2 border-t border-gray-100 pt-2">
+            <FirmaSecuencialPanel
+              procesoId={procesoId}
+              etapaCod={etapa.cod}
+              firmas={etapa.firmas ?? []}
+              onRefresh={() => {
+                // Parent LineaTiempo will invalidate queries via onRefresh if provided
+              }}
             />
           </div>
         )}

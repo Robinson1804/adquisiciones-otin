@@ -370,8 +370,19 @@ describe("AdjuntosEtapa — upload error surfacing", () => {
 // ----------------------------------------------------------------
 
 describe("AdjuntosEtapa — catalog sync gating (CODIGOS_CON_ADJUNTOS)", () => {
-  it("CODIGOS_CON_ADJUNTOS has exactly 17 key stage codes", () => {
-    expect(CODIGOS_CON_ADJUNTOS.size).toBe(17);
+  // flujo-real-otin-v2: 19 codes — E01a/E01b/E01c replace E01 (+2 net)
+  it("CODIGOS_CON_ADJUNTOS has exactly 19 key stage codes", () => {
+    expect(CODIGOS_CON_ADJUNTOS.size).toBe(19);
+  });
+
+  it("E01 is NOT in CODIGOS_CON_ADJUNTOS (removed in flujo-real-otin-v2)", () => {
+    expect(CODIGOS_CON_ADJUNTOS.has("E01")).toBe(false);
+  });
+
+  it("E01a, E01b, E01c are in CODIGOS_CON_ADJUNTOS (replaced E01)", () => {
+    expect(CODIGOS_CON_ADJUNTOS.has("E01a")).toBe(true);
+    expect(CODIGOS_CON_ADJUNTOS.has("E01b")).toBe(true);
+    expect(CODIGOS_CON_ADJUNTOS.has("E01c")).toBe(true);
   });
 
   it("E04 is NOT in CODIGOS_CON_ADJUNTOS", () => {

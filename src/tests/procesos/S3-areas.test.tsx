@@ -246,6 +246,9 @@ describe("S3 — AreaSelector toggle agrega y quita abrev", () => {
     // Seleccionar tipo
     fireEvent.click(screen.getByDisplayValue("SERVICIO"));
 
+    // Seleccionar area_iniciadora (required)
+    fireEvent.change(screen.getByLabelText(/Área iniciadora/i), { target: { value: "OTIN" } });
+
     // Seleccionar OTIN y DTDIS
     fireEvent.click(screen.getByRole("button", { name: /^Area OTIN$/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Area DTDIS$/i }));

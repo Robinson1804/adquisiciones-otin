@@ -83,8 +83,10 @@ describe("ModalRegistroEtapa", () => {
     mockActualizar.mockReset();
   });
 
-  it("E01 modal shows cmn_adjunto select field", () => {
-    const etapa = makeEtapa('E01');
+  // flujo-real-otin-v2: E01 removed. E01c is por_area → delegates to TablaAreasE24.
+  // E01b has fecha_limite_respuesta campo.
+  it("E01c modal delegates to TablaAreasE24 (por_area stage)", () => {
+    const etapa = makeEtapa('E01c', { por_area: true });
     render(
       React.createElement(ModalRegistroEtapa, {
         procesoId: 1,
@@ -96,9 +98,29 @@ describe("ModalRegistroEtapa", () => {
       { wrapper: Wrapper }
     );
 
-    // cmn_adjunto select should be present
-    expect(screen.getByLabelText(/CMN Adjunto/i)).toBeInTheDocument();
-    // monto fields should NOT be present for E01
+    // E01c is por_area → delegates to TablaAreasE24
+    expect(screen.getByTestId("tabla-areas-e24-mock")).toBeInTheDocument();
+    // Should NOT render the standard form fields
+    expect(screen.queryByLabelText(/Fecha Inicio/i)).not.toBeInTheDocument();
+  });
+
+  it("E01b modal shows common fields and fecha_limite_respuesta picker", () => {
+    const etapa = makeEtapa('E01b');
+    render(
+      React.createElement(ModalRegistroEtapa, {
+        procesoId: 1,
+        etapa,
+        open: true,
+        onClose: vi.fn(),
+      }),
+      { wrapper: Wrapper }
+    );
+
+    // Common fields present
+    expect(screen.getByLabelText(/Fecha Inicio/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Estado/i)).toBeInTheDocument();
+    // E01b has fecha_limite_respuesta campo shown in the modal (T18)
+    expect(screen.getByLabelText(/Fecha limite de respuesta/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Monto Cert/i)).not.toBeInTheDocument();
   });
 

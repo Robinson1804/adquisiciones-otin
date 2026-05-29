@@ -291,8 +291,8 @@ export default function DetalleProceso() {
               )}
             </FichaRow>
 
-            <FichaRow label="Unidad Solicitante">
-              {proceso.unidad_resp ?? "—"}
+            <FichaRow label="Área iniciadora">
+              {proceso.area_iniciadora ?? "—"}
             </FichaRow>
 
             <FichaRow label="Año">{proceso.anno ?? "—"}</FichaRow>
@@ -375,6 +375,22 @@ export default function DetalleProceso() {
                   })}
                 </div>
               </FichaRow>
+            )}
+
+            {/* CMN del proceso — flujo-real-otin-v2 */}
+            {(proceso.denominacion_cmn || proceso.clasificador_cmn) && (
+              <>
+                {proceso.denominacion_cmn && (
+                  <FichaRow label="Denominación CMN">
+                    {proceso.denominacion_cmn}
+                  </FichaRow>
+                )}
+                {proceso.clasificador_cmn && (
+                  <FichaRow label="Clasificador de gasto">
+                    {proceso.clasificador_cmn}
+                  </FichaRow>
+                )}
+              </>
             )}
 
             {/* Motivo cancelación */}

@@ -28,19 +28,33 @@ export const COLORES_ESTADO = {
 } as const;
 
 // ============================================================
-// CATÁLOGO COMPLETO DE ETAPAS — fuente canónica: CONTEXT.md §8
-// 28 entradas: E01–E25 incluyendo E06b, E08a y E08b
-// C3c: acepta_adjuntos field mirrors backend CODIGOS_CON_ADJUNTOS (17 key stages).
+// CATÁLOGO COMPLETO DE ETAPAS — fuente canónica: etapas_catalogo.py (backend)
+// 32 entradas: flujo-real-otin-v2 — E01a/E01b/E01c/E02b/E06c agregados, E01 removido.
+// C3c: acepta_adjuntos field mirrors backend CODIGOS_CON_ADJUNTOS.
 // ============================================================
 export const ETAPAS_CONFIG = [
-  { cod: 'E01',  area: 'AREAS',       nombre: 'Solicitud de requerimiento TIC (Áreas → OTIN)',
-    instruccion: 'Una fila por área. Validar CMN de TODAS antes de avanzar.',
-    campos_extra: ['cmn_adjunto'], acepta_adjuntos: true as const },
+  // ---- FASE 1 — Requerimiento y TDR ----
+  { cod: 'E01a', area: 'AREAS',       nombre: 'Solicitud inicial área iniciadora (Área → OTIN)',
+    instruccion: 'El área iniciadora solicita el proceso. Sin por_area.',
+    acepta_adjuntos: true as const },
+
+  { cod: 'E01b', area: 'OTIN',        nombre: 'Oficio circular OTIN → áreas usuarias',
+    instruccion: 'OTIN notifica a todas las áreas usuarias. Registrar fecha límite de respuesta.',
+    campos_extra: ['fecha_limite_respuesta'], acepta_adjuntos: true as const },
+
+  { cod: 'E01c', area: 'AREAS',       nombre: 'Respuesta área con requerimiento + CMN/SIGA (Áreas → OTIN)',
+    instruccion: 'Una fila por área. Confirmar CMN/SIGA antes de avanzar.',
+    por_area: true as const, campos_extra: ['cmn_siga_confirmado'],
+    acepta_adjuntos: true as const },
 
   { cod: 'E02',  area: 'OTIN',        nombre: 'Elaboración TDR consolidado (OTIN)',
     instruccion: 'OTIN consolida todos los requerimientos en un solo TDR.',
     acepta_adjuntos: true as const },
 
+  { cod: 'E02b', area: 'AREAS',       nombre: 'V°B° secuencial áreas del TDR',
+    instruccion: 'V°B° secuencial de áreas del TDR. Tracked via firma_secuencial.' },
+
+  // ---- FASE 2 — Indagación y Evaluación ----
   { cod: 'E03',  area: 'OTIN',        nombre: 'Envío indagación de mercado (OTIN → OTA)',
     instruccion: 'OTIN envía TDR a OTA. Registrar N° oficio.',
     acepta_adjuntos: true as const },
@@ -57,10 +71,14 @@ export const ETAPAS_CONFIG = [
     es_bucle: true as const, campos_extra: ['motivo_bucle', 'nro_ronda'],
     acepta_adjuntos: true as const },
 
-  { cod: 'E06b', area: 'BUCLE',       nombre: 'Solicitud V°B° DTDIS (OTIN → DTDIS)',
+  { cod: 'E06b', area: 'BUCLE',       nombre: 'Solicitud V°B° DTDIS [BUCLE] (OTIN → DTDIS)',
     instruccion: 'OTIN solicita V°B° a DTDIS. Registrar motivo + N° ronda.',
     es_bucle: true as const, campos_extra: ['motivo_bucle', 'nro_ronda'],
     acepta_adjuntos: true as const },
+
+  { cod: 'E06c', area: 'BUCLE',       nombre: 'Re-V°B° secuencial post-corrección [BUCLE]',
+    instruccion: 'Re-V°B° secuencial post-corrección. Cada ronda es independiente.',
+    es_bucle: true as const },
 
   { cod: 'E07',  area: 'OEAS',        nombre: 'Evaluación técnica (OEAS → OTIN)',
     instruccion: 'OEAS verifica que proveedores cumplen TDR.',
@@ -78,6 +96,7 @@ export const ETAPAS_CONFIG = [
     instruccion: 'Proveedor subsana → OEAS re-evalúa → OTIN responde.',
     es_bucle: true as const, campos_extra: ['motivo_bucle', 'nro_ronda'] },
 
+  // ---- FASE 3 — Presupuesto y Certificación ----
   { cod: 'E09',  area: 'OEAS',        nombre: 'Cuadro comparativo (OEAS → OTIN)',
     instruccion: 'Solo cuando eval. técnica APROBADA. Registrar valor EM.',
     campos_extra: ['monto_cert'], acepta_adjuntos: true as const },
@@ -108,6 +127,7 @@ export const ETAPAS_CONFIG = [
     campos_extra: ['fecha_envio_otpp', 'fecha_resp_otpp'],
     alerta_dias: 20 as const, acepta_adjuntos: true as const },
 
+  // ---- FASE 4 — Orden y Ejecución ----
   { cod: 'E17',  area: 'OTPP',        nombre: 'OTPP envía a OTA (OTPP → OTA)',
     instruccion: 'OTPP remite expediente certificado a OTA.' },
 
@@ -127,6 +147,7 @@ export const ETAPAS_CONFIG = [
   { cod: 'E22',  area: 'PROVEEDOR',   nombre: 'Inicio de servicio / entrega del bien',
     instruccion: 'Registrar FECHA REAL DE INICIO.', acepta_adjuntos: true as const },
 
+  // ---- FASE 5 — Conformidad ----
   { cod: 'E23',  area: 'OTIN',        nombre: 'OTIN solicita conformidad (OTIN → Áreas)',
     instruccion: 'Notificar a cada área que emita conformidad.' },
 
@@ -167,6 +188,8 @@ export const DEPENDENCIAS: readonly Dependencia[] = [
 // Mirrors backend CODIGOS_CON_ADJUNTOS (frozenset).
 // Test-sync: both sets must contain exactly these 17 codes.
 // ============================================================
+// Derived from ETAPAS_CONFIG acepta_adjuntos=true entries.
+// E01a, E01b, E01c replace E01. E01 removed.
 export const CODIGOS_CON_ADJUNTOS = new Set<string>([
-  'E01', 'E02', 'E03', 'E06', 'E06b', 'E07', 'E08', 'E09', 'E11', 'E13', 'E14', 'E15', 'E16', 'E19', 'E20', 'E22', 'E24',
+  'E01a', 'E01b', 'E01c', 'E02', 'E03', 'E06', 'E06b', 'E07', 'E08', 'E09', 'E11', 'E13', 'E14', 'E15', 'E16', 'E19', 'E20', 'E22', 'E24',
 ]);

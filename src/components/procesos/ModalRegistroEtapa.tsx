@@ -50,6 +50,7 @@ function getLabelForCampo(campo: string): string {
     nro_ocs: 'N. OCS',
     monto_ocs: 'Monto OCS S/.',
     plazo_entrega: 'Plazo Entrega (dias)',
+    fecha_limite_respuesta: 'Fecha limite de respuesta',
   };
   return labels[campo] ?? campo;
 }
@@ -151,6 +152,9 @@ export function ModalRegistroEtapa({
   const [plazoEntrega, setPlazoEntrega] = useState<string>(
     () => numOrEmpty(filaExistente?.plazo_entrega)
   );
+  const [fechaLimiteRespuesta, setFechaLimiteRespuesta] = useState<string>(
+    () => filaExistente?.fecha_limite_respuesta ?? ""
+  );
 
   if (!open) return null;
 
@@ -192,7 +196,7 @@ export function ModalRegistroEtapa({
               filas={etapa.filas}
               areasUsuarias={areasUsuarias}
               fechaInicioChain={fechaInicioSugerida}
-              fechaLabel={etapa.cod === 'E01' ? 'Fecha de solicitud' : 'Fecha conformidad'}
+              fechaLabel={etapa.cod === 'E01c' ? 'Fecha de solicitud' : 'Fecha conformidad'}
               codigoEtapa={etapa.cod}
               nombreEtapa={etapa.nombre}
             />
@@ -232,6 +236,8 @@ export function ModalRegistroEtapa({
       payload.monto_ocs = parseFloat(montoOcs);
     if (camposExtra.includes('plazo_entrega') && plazoEntrega)
       payload.plazo_entrega = parseInt(plazoEntrega, 10);
+    if (camposExtra.includes('fecha_limite_respuesta') && fechaLimiteRespuesta)
+      payload.fecha_limite_respuesta = fechaLimiteRespuesta;
 
     // Bucle: si ya existe una ronda, ACTUALIZARLA (no insertar otra).
     // Simple (no bucle, no por-area): si ya hay una fila, ACTUALIZARLA — antes
@@ -532,6 +538,22 @@ export function ModalRegistroEtapa({
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="30"
                 aria-required="true"
+              />
+            </div>
+          )}
+
+          {camposExtra.includes('fecha_limite_respuesta') && (
+            <div>
+              <label htmlFor={`${etapa.cod}-fecha-limite`} className="block text-xs font-medium text-gray-700 mb-1">
+                {getLabelForCampo('fecha_limite_respuesta')}
+              </label>
+              <input
+                id={`${etapa.cod}-fecha-limite`}
+                type="date"
+                value={fechaLimiteRespuesta}
+                onChange={(e) => setFechaLimiteRespuesta(e.target.value)}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                aria-label="Fecha limite de respuesta"
               />
             </div>
           )}

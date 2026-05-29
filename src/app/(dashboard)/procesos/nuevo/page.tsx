@@ -47,7 +47,9 @@ const procesoSchema = z.object({
   tipo: z.enum(["BIEN", "SERVICIO"], {
     required_error: "Seleccioná el tipo de adquisición",
   }),
-  unidad_resp: z.string().optional(),
+  area_iniciadora: z
+    .string()
+    .min(1, "Seleccioná el área iniciadora"),
   areas_usuarias: z
     .array(z.string())
     .min(1, "Debés seleccionar al menos un área usuaria"),
@@ -59,6 +61,8 @@ const procesoSchema = z.object({
   fecha_solicitud: z
     .string()
     .min(1, "La fecha de solicitud es requerida"),
+  denominacion_cmn: z.string().optional(),
+  clasificador_cmn: z.string().optional(),
   cmn_por_area: z.array(cmnPorAreaSchema),
 });
 
@@ -268,11 +272,13 @@ export default function NuevoProcesoPage() {
     defaultValues: {
       requerimiento: "",
       tipo: undefined,
-      unidad_resp: "",
+      area_iniciadora: "",
       areas_usuarias: [],
       pim: undefined,
       anno: CURRENT_YEAR,
       fecha_solicitud: TODAY_ISO,
+      denominacion_cmn: "",
+      clasificador_cmn: "",
       cmn_por_area: [],
     },
   });
@@ -311,11 +317,13 @@ export default function NuevoProcesoPage() {
       {
         requerimiento: data.requerimiento,
         tipo: data.tipo,
-        unidad_resp: data.unidad_resp ?? null,
+        area_iniciadora: data.area_iniciadora,
         areas_usuarias: data.areas_usuarias,
         pim: data.pim ?? null,
         anno: data.anno,
         fecha_solicitud: data.fecha_solicitud,
+        denominacion_cmn: data.denominacion_cmn ?? null,
+        clasificador_cmn: data.clasificador_cmn ?? null,
         cmn_por_area: data.cmn_por_area.map((c) => ({
           area: c.area,
           cmn_adjunto: c.cmn_adjunto,
@@ -386,7 +394,7 @@ export default function NuevoProcesoPage() {
               <FieldError message={errors.anno?.message} />
             </div>
 
-            {/* Fecha de Solicitud — registra E01 (arranque del proceso) */}
+            {/* Fecha de Solicitud — registra E01a (arranque del proceso) */}
             <div>
               <label
                 htmlFor="fecha_solicitud"
@@ -402,26 +410,33 @@ export default function NuevoProcesoPage() {
                 aria-required="true"
               />
               <p className="text-[11px] text-gray-400 mt-1">
-                Fecha en que el área solicitó el requerimiento. Registra E01 automáticamente.
+                Fecha en que el área solicitó el requerimiento. Registra E01a automáticamente.
               </p>
               <FieldError message={errors.fecha_solicitud?.message} />
             </div>
 
-            {/* Unidad Solicitante */}
+            {/* Área iniciadora */}
             <div>
               <label
-                htmlFor="unidad_resp"
+                htmlFor="area_iniciadora"
                 className="block text-xs font-medium text-gray-600 mb-1"
               >
-                Unidad Solicitante
+                Área iniciadora <span className="text-red-500">*</span>
               </label>
-              <input
-                id="unidad_resp"
-                type="text"
-                {...register("unidad_resp")}
-                placeholder="Ej: OTIN"
+              <select
+                id="area_iniciadora"
+                {...register("area_iniciadora")}
                 className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
+                aria-label="Área iniciadora"
+              >
+                <option value="">— Seleccionar área —</option>
+                {DEPENDENCIAS.map((dep) => (
+                  <option key={dep.abrev} value={dep.abrev}>
+                    {dep.abrev} — {dep.nombre}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={errors.area_iniciadora?.message} />
             </div>
 
             {/* Tipo */}
@@ -484,6 +499,42 @@ export default function NuevoProcesoPage() {
 
         {/* Section 3 — CMN por Área */}
         <SectionCard title="3. Validación CMN">
+          {/* CMN metadata fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+            <div>
+              <label
+                htmlFor="denominacion_cmn"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                Denominación CMN
+              </label>
+              <input
+                id="denominacion_cmn"
+                type="text"
+                {...register("denominacion_cmn")}
+                placeholder="SUSCRIPCIÓN ANUAL A LICENCIA DE SOFTWARE"
+                className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                aria-label="Denominación CMN"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="clasificador_cmn"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                Clasificador de gasto
+              </label>
+              <input
+                id="clasificador_cmn"
+                type="text"
+                {...register("clasificador_cmn")}
+                placeholder="2.3.2.5.1.99"
+                className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                aria-label="Clasificador de gasto"
+              />
+            </div>
+          </div>
+
           {(areasSeleccionadas ?? []).length === 0 ? (
             <p className="text-xs text-gray-400">
               Seleccioná áreas usuarias para configurar el CMN por área.

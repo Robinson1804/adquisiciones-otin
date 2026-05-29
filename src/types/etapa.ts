@@ -12,6 +12,8 @@ export interface FilaArea {
   dias: number | null;
   // Stage-specific optional fields
   cmn_adjunto?: string;
+  cmn_siga_confirmado?: boolean | null;  // E01c: CMN/SIGA confirmed by area
+  fecha_limite_respuesta?: string | null; // E01b/E10: deadline for response
   monto_cert?: number;
   resultado_eval?: string;
   nro_ocs?: string;
@@ -39,6 +41,22 @@ export interface RondaBucle {
 
 export type EstadoEtapa = 'COMPLETADO' | 'EN_CURSO' | 'PENDIENTE' | 'OMITIDO' | 'NO_APLICA';
 
+// Defined here (before EtapaAgrupada) to allow forward reference in firmas field.
+export type EstadoFirma = 'PENDIENTE' | 'RECIBIDO' | 'FIRMADO' | 'RECHAZADO';
+
+export interface FirmaSecuencial {
+  id: number;
+  proceso_id: number;
+  etapa_cod: string;
+  area: string;
+  orden: number;
+  estado: EstadoFirma;
+  ronda: number;
+  fecha_recibido: string | null;
+  fecha_firmado: string | null;
+  motivo_rechazo?: string | null;
+}
+
 export interface EtapaAgrupada {
   cod: string;
   nombre: string;
@@ -50,6 +68,8 @@ export interface EtapaAgrupada {
   rondas: RondaBucle[];
   alerta_otpp: boolean | null;
   monto_total: number | null;
+  /** flujo-real-otin-v2: firma_secuencial rows for E02b/E06c (from proceso payload, no separate GET) */
+  firmas?: FirmaSecuencial[];
 }
 
 export interface Progreso {
@@ -88,6 +108,8 @@ export interface EtapaCreatePayload {
   // Per-stage optional fields
   area_usuaria?: string;
   cmn_adjunto?: string;
+  cmn_siga_confirmado?: boolean;  // E01c
+  fecha_limite_respuesta?: string; // E01b / E10
   monto_cert?: number;
   resultado_eval?: string;
   motivo_bucle?: string;
@@ -136,4 +158,12 @@ export interface ArchivoMeta {
   tamano_bytes: number;
   subido_por: string;
   subido_en: string; // ISO datetime string
+}
+
+// Wizard input for batch O/S registration
+export interface OrdenServicioInput {
+  nro_ocs: string;
+  monto_ocs: number;
+  plazo_entrega: number;
+  fechas: Partial<Record<'E14' | 'E15' | 'E16' | 'E17' | 'E18' | 'E19' | 'E20', string>>;
 }

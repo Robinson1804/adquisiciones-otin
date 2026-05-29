@@ -23,15 +23,19 @@ export interface EtapaActionability {
  * Mirrors etapas_catalogo.py prerequisitos from backend (Design D1).
  * C3b: extended with R6/R7 and E08a/E08b.
  * C3c: extended with the full main chain (D7).
+ * flujo-real-otin-v2: E01 replaced by E01a→E01b→E01c; E02b inserted after E02.
  *
- * Main chain: E01→E02→E03→E04→E07→E08→E09→E10→E11→E12→E13→E14→E15
- *             →E16→E17→E18→E19→E20→E21→E22→E23→E24→E25
- * Optional loops (NOT in chain): E05/E06←E04, E08a/E08b←E08
+ * Main chain: E01a→E01b→E01c→E02→E02b→E03→E04→E07→E08→E09→E10→E11→E12
+ *             →E13→E14→E15→E16→E17→E18→E19→E20→E21→E22→E23→E24→E25
+ * Optional loops (NOT in chain): E05/E06/E06b/E06c←E04, E08a/E08b←E08
  */
 export const PREREQUISITOS: Record<string, string[]> = {
   // Main chain (C3c — each requires the previous chain stage COMPLETADO)
-  E02: ['E01'],       // R1 — also checks all E01 cmn_adjunto='SI'
-  E03: ['E02'],
+  E01b: ['E01a'],
+  E01c: ['E01b'],
+  E02: ['E01c'],      // all E01c areas must be COMPLETADO (checked by backend per-area gate)
+  E02b: ['E02'],
+  E03: ['E02b'],
   E04: ['E03'],
   E07: ['E04'],
   E08: ['E07'],
@@ -56,6 +60,7 @@ export const PREREQUISITOS: Record<string, string[]> = {
   E05: ['E04'],       // R6 — E04 must be COMPLETADO
   E06: ['E04'],       // R6
   E06b: ['E04'],      // R6 — same anchor as E05/E06; bucle OTIN→DTDIS
+  E06c: ['E04'],      // R6 — re-V°B° post-corrección bucle
   E08a: ['E08'],
   E08b: ['E08'],
 };
@@ -65,9 +70,11 @@ export const PREREQUISITOS: Record<string, string[]> = {
  * Mirrors the Spanish messages from backend validaciones.py (Design §LAS 8 REGLAS).
  */
 const BLOCK_MESSAGES: Record<string, string> = {
-  'E02:E01': 'Todas las áreas deben tener CMN = SI antes de iniciar E02',
+  'E02:E01c': 'Todas las áreas deben completar E01c (requerimiento + CMN/SIGA) antes de iniciar E02',
   'E05:E04': 'E04 debe estar COMPLETADO antes de iniciar bucle TDR (E05/E06)',
   'E06:E04': 'E04 debe estar COMPLETADO antes de iniciar bucle TDR (E05/E06)',
+  'E06b:E04': 'E04 debe estar COMPLETADO antes de iniciar bucle DTDIS (E06b)',
+  'E06c:E04': 'E04 debe estar COMPLETADO antes de iniciar re-V°B° (E06c)',
   'E08a:E08': 'E08 debe estar COMPLETADO antes de registrar E08a',
   'E08b:E08': 'E08 debe estar COMPLETADO antes de registrar E08b',
   'E09:E08': 'E08 debe tener resultado APROBADO antes de registrar E09',
@@ -111,16 +118,17 @@ export function getEtapaActionability(
       };
     }
 
-    // R1: E02 — additionally check all E01 filas have cmn_adjunto='SI'
-    if (etapa.cod === 'E02' && prereqCod === 'E01') {
-      const sinCmn = (prereqEtapa.filas ?? []).filter(
-        (f) => f.cmn_adjunto !== 'SI'
+    // E02: check all E01c areas have estado COMPLETADO or NO_APLICA
+    // (backend also enforces this; this is UX defense-in-depth)
+    if (etapa.cod === 'E02' && prereqCod === 'E01c' && prereqEtapa.por_area) {
+      const pendientes = (prereqEtapa.filas ?? []).filter(
+        (f) => f.estado_etapa === 'PENDIENTE' || f.estado_etapa === 'EN_CURSO'
       );
-      if (sinCmn.length > 0) {
-        const areas = sinCmn.map((f) => f.area_usuaria).join(', ');
+      if (pendientes.length > 0) {
+        const areas = pendientes.map((f) => f.area_usuaria).join(', ');
         return {
           canRegister: false,
-          blockedReason: `CMN pendiente en áreas: ${areas}`,
+          blockedReason: `E01c pendiente en áreas: ${areas}`,
         };
       }
     }
@@ -195,7 +203,7 @@ function getUltimaRondaFecha(etapa: EtapaAgrupada | undefined): string | null {
 
 /**
  * Suggested start date for a stage = end date of its chain prerequisite(s).
- * Returns null for the root stage (E01) or when no prerequisite has a date yet.
+ * Returns null for the root stage (E01a) or when no prerequisite has a date yet.
  *
  * Indagación de mercado: la evaluación técnica (E07) "comienza a correr" desde el
  * envío/derivación normal (E04). Pero si hubo corrección del TDR (bucle E06), el

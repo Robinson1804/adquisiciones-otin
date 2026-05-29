@@ -117,6 +117,10 @@ describe("S3 — NuevoProcesoPage Zod validation", () => {
     const dtdisBtn = screen.getByRole("button", { name: /^Area DTDIS$/i });
     fireEvent.click(dtdisBtn);
 
+    // Select area_iniciadora (now required)
+    const areaIniciadora = screen.getByLabelText(/Área iniciadora/i);
+    fireEvent.change(areaIniciadora, { target: { value: "OTIN" } });
+
     // Submit
     const submitBtn = screen.getByRole("button", { name: /Crear Proceso/i });
     fireEvent.click(submitBtn);

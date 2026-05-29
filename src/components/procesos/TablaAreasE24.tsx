@@ -51,7 +51,8 @@ export function TablaAreasE24({
   const { user } = useAuthStore();
   const canEdit = user?.rol === "ADMIN" || user?.rol === "EDITOR";
 
-  const isE01 = codigoEtapa === "E01";
+  // flujo-real-otin-v2: E01 removed; E01c is the area-level requerimiento stage
+  const isE01 = codigoEtapa === "E01" || codigoEtapa === "E01c";
 
   const [rowState, setRowState] = useState<Record<string, RowState>>(() => {
     const state: Record<string, RowState> = {};

@@ -466,7 +466,8 @@ describe("EtapaCard", () => {
       logout: vi.fn(),
     } as ReturnType<typeof useAuthStore>);
 
-    const etapa = makeEtapa('E01', { area_responsable: 'AREAS' });
+    // Use E01a (replaces E01 in flujo-real-otin-v2)
+    const etapa = makeEtapa('E01a', { area_responsable: 'AREAS' });
     const { container } = render(
       React.createElement(EtapaCard, {
         etapa,

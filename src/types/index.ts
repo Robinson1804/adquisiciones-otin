@@ -38,6 +38,10 @@ export interface Proceso {
   fecha_creacion: string;
   creado_por: string | null;
   anno: number | null;
+  // flujo-real-otin-v2 additions
+  denominacion_cmn?: string | null;
+  clasificador_cmn?: string | null;
+  area_iniciadora?: string | null;
 }
 
 export interface PaginatedProcesos {
@@ -51,12 +55,15 @@ export interface PaginatedProcesos {
 export interface ProcesoCreatePayload {
   requerimiento: string;
   tipo: TipoProceso;
-  unidad_resp?: string | null;
+  // unidad_resp is hardcoded to "OTIN" by backend — do NOT send from frontend
   areas_usuarias: string[];
   pim?: number | null;
   anno: number;
-  cmn_por_area: { area: string; cmn_adjunto: "SI" | "NO" }[];
-  /** ISO date (YYYY-MM-DD). When set, E01 is auto-completed as the process kickoff. */
+  // flujo-real-otin-v2: area_iniciadora is required; CMN fields optional
+  area_iniciadora: string;
+  denominacion_cmn?: string | null;
+  clasificador_cmn?: string | null;
+  /** ISO date (YYYY-MM-DD). When set, E01a is auto-completed as the process kickoff. */
   fecha_solicitud?: string | null;
 }
 

@@ -46,16 +46,16 @@ function makeFilaArea(overrides: Partial<FilaArea> = {}): FilaArea {
 // ----------------------------------------------------------------
 
 describe("getEtapaActionability — no prerequisites", () => {
-  // E03 now has prereq E02 in C3c — verify it is blocked when E02 absent
-  it("E03 now has prereq E02 (C3c) → blocked when E02 absent", () => {
+  // E03 now has prereq E02b in flujo-real-otin-v2 — verify it is blocked when E02b absent
+  it("E03 now has prereq E02b (flujo-real-otin-v2) → blocked when E02b absent", () => {
     const etapa = makeEtapa('E03');
     const result = getEtapaActionability(etapa, [etapa]);
     expect(result.canRegister).toBe(false);
-    expect(result.blockedReason).toMatch(/E02/);
+    expect(result.blockedReason).toMatch(/E02b/);
   });
 
-  it("E01 has no prereq → canRegister: true", () => {
-    const etapa = makeEtapa('E01');
+  it("E01a has no prereq → canRegister: true", () => {
+    const etapa = makeEtapa('E01a');
     const result = getEtapaActionability(etapa, [etapa]);
     expect(result.canRegister).toBe(true);
     expect(result.blockedReason).toBeNull();
@@ -63,42 +63,45 @@ describe("getEtapaActionability — no prerequisites", () => {
 });
 
 // ----------------------------------------------------------------
-// R1 — E02: all E01 areas must have cmn_adjunto='SI'
+// E02: prereq is E01c (por_area) — all areas must be COMPLETADO or NO_APLICA
+// flujo-real-otin-v2: E01 removed, E01c is the new area-level stage
 // ----------------------------------------------------------------
 
-describe("getEtapaActionability — R1 (E02 / E01 CMN)", () => {
-  it("blocked when E01 is PENDIENTE (not even completed)", () => {
-    const e01 = makeEtapa('E01', { estado: 'PENDIENTE' });
+describe("getEtapaActionability — E02 / E01c prereq", () => {
+  it("blocked when E01c is PENDIENTE (not completed)", () => {
+    const e01c = makeEtapa('E01c', { estado: 'PENDIENTE', por_area: true });
     const e02 = makeEtapa('E02');
-    const result = getEtapaActionability(e02, [e01, e02]);
+    const result = getEtapaActionability(e02, [e01c, e02]);
     expect(result.canRegister).toBe(false);
-    expect(result.blockedReason).toMatch(/E01|CMN/i);
+    expect(result.blockedReason).toMatch(/E01c/i);
   });
 
-  it("blocked when E01 is COMPLETADO but one area has cmn_adjunto!=SI", () => {
-    const e01 = makeEtapa('E01', {
+  it("blocked when E01c is COMPLETADO but one area row is PENDIENTE", () => {
+    const e01c = makeEtapa('E01c', {
       estado: 'COMPLETADO',
+      por_area: true,
       filas: [
-        makeFilaArea({ area_usuaria: 'DTDIS', cmn_adjunto: 'SI' }),
-        makeFilaArea({ area_usuaria: 'OGA', cmn_adjunto: 'PENDIENTE' }),
+        makeFilaArea({ area_usuaria: 'DTDIS', estado_etapa: 'COMPLETADO' }),
+        makeFilaArea({ area_usuaria: 'OGA', estado_etapa: 'PENDIENTE' }),
       ],
     });
     const e02 = makeEtapa('E02');
-    const result = getEtapaActionability(e02, [e01, e02]);
+    const result = getEtapaActionability(e02, [e01c, e02]);
     expect(result.canRegister).toBe(false);
     expect(result.blockedReason).toContain('OGA');
   });
 
-  it("passes when E01 is COMPLETADO and all areas have cmn_adjunto='SI'", () => {
-    const e01 = makeEtapa('E01', {
+  it("passes when E01c is COMPLETADO and all area rows are COMPLETADO", () => {
+    const e01c = makeEtapa('E01c', {
       estado: 'COMPLETADO',
+      por_area: true,
       filas: [
-        makeFilaArea({ area_usuaria: 'DTDIS', cmn_adjunto: 'SI' }),
-        makeFilaArea({ area_usuaria: 'OGA', cmn_adjunto: 'SI' }),
+        makeFilaArea({ area_usuaria: 'DTDIS', estado_etapa: 'COMPLETADO' }),
+        makeFilaArea({ area_usuaria: 'OGA', estado_etapa: 'COMPLETADO' }),
       ],
     });
     const e02 = makeEtapa('E02');
-    const result = getEtapaActionability(e02, [e01, e02]);
+    const result = getEtapaActionability(e02, [e01c, e02]);
     expect(result.canRegister).toBe(true);
     expect(result.blockedReason).toBeNull();
   });
@@ -239,13 +242,30 @@ describe("getEtapaActionability — R5 (E25 / E24 per-area)", () => {
 });
 
 // ----------------------------------------------------------------
-// C3c — Main chain prerequisite extension (D7)
+// flujo-real-otin-v2 — Main chain prerequisite (updated)
+// Chain: E01a→E01b→E01c→E02→E02b→E03→E04→E07→E08→E09→...→E25
 // ----------------------------------------------------------------
 
-describe("getEtapaActionability — C3c main chain", () => {
-  // PREREQUISITOS map contains the new chain pairs
-  it("PREREQUISITOS contains E03:['E02']", () => {
-    expect(PREREQUISITOS['E03']).toEqual(['E02']);
+describe("getEtapaActionability — main chain (flujo-real-otin-v2)", () => {
+  // New chain head: E01b prereqs E01a
+  it("PREREQUISITOS contains E01b:['E01a']", () => {
+    expect(PREREQUISITOS['E01b']).toEqual(['E01a']);
+  });
+
+  it("PREREQUISITOS contains E01c:['E01b']", () => {
+    expect(PREREQUISITOS['E01c']).toEqual(['E01b']);
+  });
+
+  it("PREREQUISITOS contains E02:['E01c']", () => {
+    expect(PREREQUISITOS['E02']).toEqual(['E01c']);
+  });
+
+  it("PREREQUISITOS contains E02b:['E02']", () => {
+    expect(PREREQUISITOS['E02b']).toEqual(['E02']);
+  });
+
+  it("PREREQUISITOS contains E03:['E02b']", () => {
+    expect(PREREQUISITOS['E03']).toEqual(['E02b']);
   });
 
   it("PREREQUISITOS contains E04:['E03']", () => {
@@ -293,19 +313,23 @@ describe("getEtapaActionability — C3c main chain", () => {
     expect(PREREQUISITOS['E08a']).toEqual(['E08']);
   });
 
-  // Functional: E03 blocked when E02 not COMPLETADO (SC-02)
-  it("E03 blocked when E02 not COMPLETADO", () => {
-    const e02 = makeEtapa('E02', { estado: 'EN_CURSO' });
-    const e03 = makeEtapa('E03');
-    const result = getEtapaActionability(e03, [e02, e03]);
-    expect(result.canRegister).toBe(false);
-    expect(result.blockedReason).toMatch(/E02/);
+  it("PREREQUISITOS E06c is ['E04'] (new bucle, anchored to E04)", () => {
+    expect(PREREQUISITOS['E06c']).toEqual(['E04']);
   });
 
-  it("E03 unblocked when E02 COMPLETADO", () => {
-    const e02 = makeEtapa('E02', { estado: 'COMPLETADO' });
+  // Functional: E03 blocked when E02b not COMPLETADO
+  it("E03 blocked when E02b not COMPLETADO", () => {
+    const e02b = makeEtapa('E02b', { estado: 'EN_CURSO' });
     const e03 = makeEtapa('E03');
-    const result = getEtapaActionability(e03, [e02, e03]);
+    const result = getEtapaActionability(e03, [e02b, e03]);
+    expect(result.canRegister).toBe(false);
+    expect(result.blockedReason).toMatch(/E02b/);
+  });
+
+  it("E03 unblocked when E02b COMPLETADO", () => {
+    const e02b = makeEtapa('E02b', { estado: 'COMPLETADO' });
+    const e03 = makeEtapa('E03');
+    const result = getEtapaActionability(e03, [e02b, e03]);
     expect(result.canRegister).toBe(true);
   });
 
@@ -366,8 +390,9 @@ describe("C3c catalog sync — CODIGOS_CON_ADJUNTOS", () => {
   });
 
   it("CODIGOS_CON_ADJUNTOS contains all expected key stage codes", () => {
+    // flujo-real-otin-v2: E01a/E01b/E01c replace E01; E01 removed
     const expected = [
-      'E01','E02','E03','E06','E06b','E07','E08',
+      'E01a','E01b','E01c','E02','E03','E06','E06b','E07','E08',
       'E09','E11','E13','E14','E15','E16','E19','E20','E22','E24',
     ];
     for (const cod of expected) {
@@ -375,14 +400,18 @@ describe("C3c catalog sync — CODIGOS_CON_ADJUNTOS", () => {
     }
   });
 
+  it("CODIGOS_CON_ADJUNTOS does NOT contain E01 (removed in flujo-real-otin-v2)", () => {
+    expect(CODIGOS_CON_ADJUNTOS.has('E01')).toBe(false);
+  });
+
   it("CODIGOS_CON_ADJUNTOS does NOT contain non-key stages", () => {
-    const nonKey = ['E04','E05','E08a','E08b','E10','E12','E17','E18','E21','E23','E25'];
+    const nonKey = ['E02b','E04','E05','E06c','E08a','E08b','E10','E12','E17','E18','E21','E23','E25'];
     for (const cod of nonKey) {
       expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(false);
     }
   });
 
-  // New stages added in this iteration
+  // Bucle entries: E05, E06, E06b, E06c, E08a, E08b
   it("E06b is in ETAPAS_CONFIG as a bucle entry", () => {
     const e06b = (ETAPAS_CONFIG as readonly { cod: string; es_bucle?: boolean }[])
       .find((e) => e.cod === 'E06b');
@@ -390,7 +419,20 @@ describe("C3c catalog sync — CODIGOS_CON_ADJUNTOS", () => {
     expect(e06b?.es_bucle).toBe(true);
   });
 
-  it("CODIGOS_CON_ADJUNTOS includes newly added E06, E06b, E08, E20, E22", () => {
+  it("E06c is in ETAPAS_CONFIG as a bucle entry (new in flujo-real-otin-v2)", () => {
+    const e06c = (ETAPAS_CONFIG as readonly { cod: string; es_bucle?: boolean }[])
+      .find((e) => e.cod === 'E06c');
+    expect(e06c).toBeDefined();
+    expect(e06c?.es_bucle).toBe(true);
+  });
+
+  it("CODIGOS_CON_ADJUNTOS includes E01a, E01b, E01c (replaces E01)", () => {
+    for (const cod of ['E01a', 'E01b', 'E01c']) {
+      expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(true);
+    }
+  });
+
+  it("CODIGOS_CON_ADJUNTOS includes E06, E06b, E08, E20, E22", () => {
     for (const cod of ['E06', 'E06b', 'E08', 'E20', 'E22']) {
       expect(CODIGOS_CON_ADJUNTOS.has(cod)).toBe(true);
     }
