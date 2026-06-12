@@ -1,16 +1,28 @@
 /**
- * C3a — LineaTiempo tests.
- * WU-12: renders etapa cards, bucle shows ronda badge, COLORES_ACTOR applied.
- * Updated: 28 etapas (added E06b).
+ * LineaTiempo tests — post-refactor: modo "lista" removido, reemplazado por "foco".
+ *
+ * Tests conservados:
+ *  - Skeleton, error, mapa (5 fases), toggle mapa/foco
+ *
+ * Tests eliminados (modo "lista" ya no existe):
+ *  - renders 26 visible etapa cards
+ *  - renders all non-bucle etapa codes as article labels
+ *  - bucle stage with ronda badge
+ *  - AREAS actor chip inside EtapaCard
+ *  - Cambio-1 bucle hidden / shown (esas validaciones viven en FocoEtapa + MapaProceso)
+ *
+ * Nuevos tests:
+ *  - Toggle mapa → foco muestra FocoEtapa
+ *  - Botón "Foco" tiene aria-selected correcto
+ *  - Click en etapa del mapa cambia a modo foco con etapa seleccionada
  */
 
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LineaTiempo } from "@/components/procesos/LineaTiempo";
 import type { EtapasResponse } from "@/types/etapa";
-import { COLORES_ACTOR } from "@/lib/constants";
 
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn(() => ({
@@ -26,39 +38,36 @@ vi.mock("@/hooks/useEtapas", () => ({
   useEtapas: vi.fn(),
   useAgregarRonda: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useReiniciarTdr: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useRegistrarEtapa: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useActualizarEtapa: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useRegistrarEtapa: vi.fn(() => ({ mutate: vi.fn(), isPending: false, isError: false, error: null })),
+  useActualizarEtapa: vi.fn(() => ({ mutate: vi.fn(), isPending: false, isError: false, error: null })),
 }));
 
-// Mock ModalRegistroEtapa to avoid deep render
 vi.mock("@/components/procesos/ModalRegistroEtapa", () => ({
   ModalRegistroEtapa: () => React.createElement("div", { "data-testid": "modal-mock" }),
 }));
 
-// Mock AdjuntosEtapa — EtapaCard now renders it inside the expandable panel
 vi.mock("@/components/procesos/AdjuntosEtapa", () => ({
   AdjuntosEtapa: ({ etapaId }: { etapaId: number }) =>
-    React.createElement('div', { 'data-testid': `adjuntos-mock-${etapaId}` }, 'Adjuntos mock'),
+    React.createElement("div", { "data-testid": `adjuntos-mock-${etapaId}` }, "Adjuntos mock"),
 }));
 
 import { useEtapas } from "@/hooks/useEtapas";
 
-// flujo-real-otin-v2: 32 etapas — E01 removed, E01a/E01b/E01c/E02b/E06c added
 const ETAPA_CODES = [
-  'E01a','E01b','E01c','E02','E02b',
-  'E03','E04','E05','E06','E06b','E06c','E07','E08','E08a','E08b',
-  'E09','E10','E11','E12','E13','E14','E15','E16','E17','E18',
-  'E19','E20','E21','E22','E23','E24','E25',
+  "E01a", "E01b", "E01c", "E02", "E02b",
+  "E03", "E04", "E05", "E06", "E06b", "E06c", "E07", "E08", "E08a", "E08b",
+  "E09", "E10", "E11", "E12", "E13", "E14", "E15", "E16", "E17", "E18",
+  "E19", "E20", "E21", "E22", "E23", "E24", "E25",
 ];
 
-function makeEtapa(cod: string, area = 'OTIN', overrides = {}) {
+function makeEtapa(cod: string, area = "OTIN", overrides = {}) {
   return {
     cod,
     nombre: `Etapa ${cod}`,
     area_responsable: area,
-    es_bucle: ['E05','E06','E06b','E06c','E08a','E08b'].includes(cod),
-    por_area: ['E01c','E11','E24'].includes(cod),
-    estado: 'PENDIENTE',
+    es_bucle: ["E05", "E06", "E06b", "E06c", "E08a", "E08b"].includes(cod),
+    por_area: ["E01c", "E11", "E24"].includes(cod),
+    estado: "PENDIENTE",
     filas: [],
     rondas: [],
     alerta_otpp: null,
@@ -70,7 +79,7 @@ function makeEtapa(cod: string, area = 'OTIN', overrides = {}) {
 const allPendingResponse: EtapasResponse = {
   etapas: ETAPA_CODES.map((cod) => makeEtapa(cod)),
   progreso: {
-    etapa_actual: 'E01a',
+    etapa_actual: "E01a",
     porcentaje: 0,
     completadas: 0,
     total: 26,
@@ -87,164 +96,9 @@ describe("LineaTiempo", () => {
     vi.clearAllMocks();
   });
 
-  // Cambio 1: bucle stages with no rondas are hidden → 26 non-bucle + 0 bucle = 26 visible
-  // (32 total - 6 bucles sin rondas: E05, E06, E06b, E06c, E08a, E08b)
-  it("renders 26 visible etapa cards when all bucles have no rondas (flujo-real-otin-v2)", () => {
-    vi.mocked(useEtapas).mockReturnValue({
-      data: allPendingResponse,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    const cards = screen.getAllByRole('article');
-    expect(cards).toHaveLength(26);
-  });
-
-  it("renders all non-bucle etapa codes as article labels (flujo-real-otin-v2)", () => {
-    vi.mocked(useEtapas).mockReturnValue({
-      data: allPendingResponse,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    const BUCLE_CODES = ['E05','E06','E06b','E06c','E08a','E08b'];
-    const nonBucleCodes = ETAPA_CODES.filter((cod) => !BUCLE_CODES.includes(cod));
-    for (const cod of nonBucleCodes) {
-      expect(screen.getByTestId(`etapa-card-${cod}`)).toBeInTheDocument();
-    }
-    // Bucle codes with no rondas should be absent
-    for (const cod of BUCLE_CODES) {
-      expect(screen.queryByTestId(`etapa-card-${cod}`)).not.toBeInTheDocument();
-    }
-  });
-
-  it("bucle stage E05 with 2 rondas renders Ronda badge", () => {
-    const responseWithRondas: EtapasResponse = {
-      ...allPendingResponse,
-      etapas: allPendingResponse.etapas.map((e) =>
-        e.cod === 'E05'
-          ? {
-              ...e,
-              estado: 'COMPLETADO',
-              rondas: [
-                { id: 1, nro_ronda: 1, motivo_bucle: 'Primera obs.', estado_etapa: 'COMPLETADO', fecha_inicio: '2026-04-01', fecha_fin: '2026-04-10', dias: 9 },
-                { id: 2, nro_ronda: 2, motivo_bucle: 'Segunda obs.', estado_etapa: 'EN_CURSO', fecha_inicio: '2026-04-11', fecha_fin: null, dias: null },
-              ],
-            }
-          : e
-      ),
-    };
-
-    vi.mocked(useEtapas).mockReturnValue({
-      data: responseWithRondas,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    // Should show "Ronda 2" badge (latest ronda)
-    expect(screen.getByText('Ronda 2')).toBeInTheDocument();
-  });
-
-  it("AREAS actor chip is rendered inside the E01a card (actor color in chip, not card bg)", () => {
-    const responseWithAreas: EtapasResponse = {
-      ...allPendingResponse,
-      etapas: allPendingResponse.etapas.map((e) =>
-        e.cod === 'E01a' ? { ...e, area_responsable: 'AREAS' } : e
-      ),
-    };
-
-    vi.mocked(useEtapas).mockReturnValue({
-      data: responseWithAreas,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    // Card no longer has actor bg as inline style — actor color lives in the chip only
-    const e01aCard = screen.getByTestId('etapa-card-E01a');
-    expect(e01aCard).not.toHaveStyle({ backgroundColor: COLORES_ACTOR.AREAS.bg });
-
-    // Actor chip inside E01a card shows "AREAS" label
-    const chip = e01aCard.querySelector('[data-testid="actor-chip"]');
-    expect(chip).toBeInTheDocument();
-    expect(chip).toHaveTextContent('AREAS');
-  });
-
-  // ---------------------------------------------------------------
-  // Cambio 1 — Bucles ocultos por default
-  // ---------------------------------------------------------------
-
-  it("Cambio-1: bucle stage with no rondas is NOT rendered in the timeline", () => {
-    // All bucle stages have rondas: [], so they should be hidden
-    vi.mocked(useEtapas).mockReturnValue({
-      data: allPendingResponse,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    // E05, E06, E06b, E06c, E08a, E08b all have rondas:[] → should NOT appear
-    expect(screen.queryByTestId('etapa-card-E05')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('etapa-card-E06')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('etapa-card-E06b')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('etapa-card-E06c')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('etapa-card-E08a')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('etapa-card-E08b')).not.toBeInTheDocument();
-  });
-
-  it("Cambio-1: bucle stage WITH rondas IS rendered in the timeline", () => {
-    const responseWithE05Ronda: EtapasResponse = {
-      ...allPendingResponse,
-      etapas: allPendingResponse.etapas.map((e) =>
-        e.cod === 'E05'
-          ? { ...e, rondas: [{ id: 1, nro_ronda: 1, motivo_bucle: 'obs', estado_etapa: 'EN_CURSO', fecha_inicio: null, fecha_fin: null, dias: null }] }
-          : e
-      ),
-    };
-
-    vi.mocked(useEtapas).mockReturnValue({
-      data: responseWithE05Ronda,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    expect(screen.getByTestId('etapa-card-E05')).toBeInTheDocument();
-    // E06 still has no rondas → still hidden
-    expect(screen.queryByTestId('etapa-card-E06')).not.toBeInTheDocument();
-  });
-
-  it("Cambio-1: non-bucle stages always render regardless of filas", () => {
-    vi.mocked(useEtapas).mockReturnValue({
-      data: allPendingResponse,
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useEtapas>);
-
-    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
-
-    // Non-bucle stages should always be present
-    expect(screen.getByTestId('etapa-card-E01a')).toBeInTheDocument();
-    expect(screen.getByTestId('etapa-card-E04')).toBeInTheDocument();
-    expect(screen.getByTestId('etapa-card-E08')).toBeInTheDocument();
-    expect(screen.getByTestId('etapa-card-E25')).toBeInTheDocument();
-  });
+  // ----------------------------------------------------------------
+  // Loading & error states
+  // ----------------------------------------------------------------
 
   it("shows loading skeleton when isLoading", () => {
     vi.mocked(useEtapas).mockReturnValue({
@@ -256,7 +110,7 @@ describe("LineaTiempo", () => {
 
     render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("shows error message when isError", () => {
@@ -269,7 +123,142 @@ describe("LineaTiempo", () => {
 
     render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
 
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText(/Network Error/i)).toBeInTheDocument();
+  });
+
+  // ----------------------------------------------------------------
+  // Mapa mode (default)
+  // ----------------------------------------------------------------
+
+  it("Mapa: default mode shows 'Mapa del Proceso' header and 5-phase board", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    expect(screen.getByText("Mapa del Proceso")).toBeInTheDocument();
+    expect(screen.getByText("Requerimiento")).toBeInTheDocument();
+    expect(screen.getByText("Indagación")).toBeInTheDocument();
+    expect(screen.getByText("Presupuesto")).toBeInTheDocument();
+    expect(screen.getByText("Orden")).toBeInTheDocument();
+    expect(screen.getByText("Conformidad")).toBeInTheDocument();
+  });
+
+  it("Mapa: 'Mapa' tab is aria-selected=true by default", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    expect(screen.getByRole("tab", { name: /^Mapa$/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Foco$/i })).toHaveAttribute("aria-selected", "false");
+  });
+
+  // ----------------------------------------------------------------
+  // Toggle Mapa → Foco
+  // ----------------------------------------------------------------
+
+  it("toggle 'Foco' renders FocoEtapa with the 5 phases in the nav", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Foco$/i }));
+
+    // FocoEtapa renders nav with phase labels
+    expect(screen.getByText("Requerimiento y TDR")).toBeInTheDocument();
+    // Header changes
+    expect(screen.getByText("Registro de Etapas")).toBeInTheDocument();
+  });
+
+  it("toggle Mapa→Foco switches aria-selected", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Foco$/i }));
+
+    expect(screen.getByRole("tab", { name: /^Foco$/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Mapa$/i })).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("clicking 'Mapa' after 'Foco' restores 'Mapa del Proceso' header", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Foco$/i }));
+    expect(screen.getByText("Registro de Etapas")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Mapa$/i }));
+    expect(screen.getByText("Mapa del Proceso")).toBeInTheDocument();
+  });
+
+  it("toggle 'Foco' without prior selection pre-selects etapa_actual (E01a) from progreso", () => {
+    vi.mocked(useEtapas).mockReturnValue({
+      data: allPendingResponse,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Foco$/i }));
+
+    // Nav row for E01a should be present (and active since it's pre-selected)
+    expect(screen.getByTestId("nav-row-E01a")).toBeInTheDocument();
+    // Hero card should appear (E01a selected)
+    expect(screen.getByTestId("foco-hero")).toBeInTheDocument();
+  });
+
+  // ----------------------------------------------------------------
+  // Progreso display
+  // ----------------------------------------------------------------
+
+  it("shows progress fraction and percentage in header", () => {
+    const responseWith5Completadas: EtapasResponse = {
+      ...allPendingResponse,
+      progreso: { etapa_actual: "E06", porcentaje: 19.23, completadas: 5, total: 26 },
+    };
+    vi.mocked(useEtapas).mockReturnValue({
+      data: responseWith5Completadas,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useEtapas>);
+
+    render(React.createElement(LineaTiempo, { procesoId: 1 }), { wrapper: Wrapper });
+
+    // Use getAllByText since "5" appears as both the completadas counter and a fase badge
+    const fiveCandidates = screen.getAllByText("5");
+    expect(fiveCandidates.length).toBeGreaterThanOrEqual(1);
+    // The progress text node "5/26 etapas" is rendered separately
+    expect(screen.getByText(/\/26/)).toBeInTheDocument();
+    expect(screen.getByText("19%")).toBeInTheDocument();
   });
 });

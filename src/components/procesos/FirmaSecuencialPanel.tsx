@@ -117,7 +117,7 @@ export function FirmaSecuencialPanel({
           const estado = firma.estado as EstadoFirma;
           const colors = ESTADO_COLORS[estado] ?? ESTADO_COLORS.PENDIENTE;
           const prevFirma = idx > 0 ? firmasOrdenadas[idx - 1] : null;
-          const esperandoAnterior = prevFirma !== null && prevFirma.estado !== "FIRMADO";
+          const esperandoAnterior = prevFirma != null && prevFirma.estado !== "FIRMADO";
           const isActive = estado === "PENDIENTE" && !esperandoAnterior;
 
           return (

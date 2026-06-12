@@ -52,6 +52,12 @@ export interface PaginatedProcesos {
   pages: number;
 }
 
+/** Mirrors backend CmnPorArea (schemas/proceso.py) — per-area CMN flag at process creation. */
+export interface CmnPorArea {
+  area: string;
+  cmn_adjunto: "SI" | "NO";
+}
+
 export interface ProcesoCreatePayload {
   requerimiento: string;
   tipo: TipoProceso;
@@ -65,6 +71,8 @@ export interface ProcesoCreatePayload {
   clasificador_cmn?: string | null;
   /** ISO date (YYYY-MM-DD). When set, E01a is auto-completed as the process kickoff. */
   fecha_solicitud?: string | null;
+  /** Per-area CMN adjunto flags at creation time (mirrors backend cmn_por_area). */
+  cmn_por_area?: CmnPorArea[];
 }
 
 export interface ProcesoUpdatePayload {
