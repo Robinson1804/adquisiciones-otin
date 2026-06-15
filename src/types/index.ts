@@ -83,6 +83,11 @@ export interface ProcesoUpdatePayload {
   pim?: number | null;
   estado?: EstadoProceso | null;
   motivo_cancel?: string | null;
+  // flujo-real-otin-v2 — campos editables de Ficha
+  anno?: number | null;
+  area_iniciadora?: string | null;
+  denominacion_cmn?: string | null;
+  clasificador_cmn?: string | null;
 }
 
 export interface ProcesoFiltros {

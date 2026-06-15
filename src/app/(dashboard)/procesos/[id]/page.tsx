@@ -14,9 +14,9 @@ import { useProceso, useActualizarProceso, useEliminarProceso } from "@/hooks/us
 import { useMontosProceso } from "@/hooks/useMontosProceso";
 import { useExportProcesoPdf } from "@/hooks/useExport";
 import { LineaTiempo } from "@/components/procesos/LineaTiempo";
-import { COLORES_ESTADO, COLORES_ACTOR } from "@/lib/constants";
-import { formatFechaCorta, formatFechaLarga } from "@/lib/fecha";
-import type { EstadoProceso } from "@/types";
+import { COLORES_ESTADO, COLORES_ACTOR, DEPENDENCIAS } from "@/lib/constants";
+import { formatFechaLarga } from "@/lib/fecha";
+import type { EstadoProceso, ProcesoUpdatePayload, TipoProceso } from "@/types";
 
 // ----------------------------------------------------------------
 // Estado badge
@@ -26,6 +26,13 @@ const ESTADO_BADGE_MAP: Record<EstadoProceso, keyof typeof COLORES_ESTADO> = {
   CULMINADO: "COMPLETADO",
   CANCELADO: "CANCELADO",
 };
+
+// ----------------------------------------------------------------
+// Estilo input en modo edición — borde azul para señalar "modo editar"
+// ----------------------------------------------------------------
+const EDIT_INPUT_CLS =
+  "w-full text-sm bg-blue-50/40 border border-blue-300 rounded px-2.5 py-1.5 " +
+  "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition";
 
 function EstadoBadge({ estado }: { estado: EstadoProceso }) {
   const key = ESTADO_BADGE_MAP[estado];
@@ -41,19 +48,23 @@ function EstadoBadge({ estado }: { estado: EstadoProceso }) {
 }
 
 // ----------------------------------------------------------------
-// Ficha field row
+// Ficha field — label arriba, valor abajo, compact y truncable
 // ----------------------------------------------------------------
-function FichaRow({
+function FichaField({
   label,
   children,
+  className = "",
 }: {
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs font-medium text-gray-500">{label}</dt>
-      <dd className="text-sm text-gray-800">{children}</dd>
+    <div className={`flex flex-col gap-1 min-w-0 ${className}`}>
+      <dt className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+        {label}
+      </dt>
+      <dd className="text-sm text-gray-800 break-words">{children}</dd>
     </div>
   );
 }
@@ -122,20 +133,119 @@ export default function DetalleProceso() {
     error: pdfExportError,
   } = useExportProcesoPdf();
 
-  // Simple inline edit state
+  // ----------------------------------------------------------------
+  // Inline edit state — draft con todos los campos editables del Ficha
+  // ----------------------------------------------------------------
+  interface FichaDraft {
+    requerimiento: string;
+    tipo: TipoProceso | "";
+    area_iniciadora: string;
+    anno: string; // como string para el input number controlled
+    pim: string;  // idem
+    areas_usuarias: string[];
+    denominacion_cmn: string;
+    clasificador_cmn: string;
+  }
+
+  const emptyDraft: FichaDraft = {
+    requerimiento: "",
+    tipo: "",
+    area_iniciadora: "",
+    anno: "",
+    pim: "",
+    areas_usuarias: [],
+    denominacion_cmn: "",
+    clasificador_cmn: "",
+  };
+
   const [editMode, setEditMode] = useState(false);
-  const [editReq, setEditReq] = useState("");
+  const [draft, setDraft] = useState<FichaDraft>(emptyDraft);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function handleEdit() {
-    setEditReq(proceso?.requerimiento ?? "");
+    if (!proceso) return;
+    setSaveError(null);
+    setDraft({
+      requerimiento: proceso.requerimiento ?? "",
+      tipo: (proceso.tipo as TipoProceso | null) ?? "",
+      area_iniciadora: proceso.area_iniciadora ?? "",
+      anno: proceso.anno != null ? String(proceso.anno) : "",
+      pim: proceso.pim ?? "",
+      areas_usuarias: proceso.areas_usuarias ?? [],
+      denominacion_cmn: proceso.denominacion_cmn ?? "",
+      clasificador_cmn: proceso.clasificador_cmn ?? "",
+    });
     setEditMode(true);
+  }
+
+  function handleCancel() {
+    setEditMode(false);
+    setDraft(emptyDraft);
+    setSaveError(null);
+  }
+
+  function toggleAreaUsuaria(area: string) {
+    setDraft((prev) =>
+      prev.areas_usuarias.includes(area)
+        ? { ...prev, areas_usuarias: prev.areas_usuarias.filter((a) => a !== area) }
+        : { ...prev, areas_usuarias: [...prev.areas_usuarias, area] }
+    );
   }
 
   function handleSave() {
     if (!proceso) return;
+    setSaveError(null);
+
+    // Validaciones mínimas
+    if (!draft.requerimiento.trim() || draft.requerimiento.trim().length < 3) {
+      setSaveError("El requerimiento debe tener al menos 3 caracteres.");
+      return;
+    }
+    if (draft.areas_usuarias.length === 0) {
+      setSaveError("Debe seleccionar al menos una dependencia involucrada.");
+      return;
+    }
+
+    // Construir payload solo con campos que cambiaron (diff vs proceso actual)
+    const payload: ProcesoUpdatePayload = {};
+    if (draft.requerimiento !== proceso.requerimiento) payload.requerimiento = draft.requerimiento.trim();
+    if (draft.tipo && draft.tipo !== proceso.tipo) payload.tipo = draft.tipo;
+    if (draft.area_iniciadora !== (proceso.area_iniciadora ?? ""))
+      payload.area_iniciadora = draft.area_iniciadora || null;
+    const annoNum = draft.anno ? Number(draft.anno) : null;
+    if (annoNum !== (proceso.anno ?? null)) payload.anno = annoNum;
+    const pimNum = draft.pim === "" ? null : Number(draft.pim);
+    const pimActual = proceso.pim ? parseFloat(proceso.pim) : null;
+    if (pimNum !== pimActual) payload.pim = pimNum;
+    const areasIguales =
+      draft.areas_usuarias.length === (proceso.areas_usuarias ?? []).length &&
+      draft.areas_usuarias.every((a) => (proceso.areas_usuarias ?? []).includes(a));
+    if (!areasIguales) payload.areas_usuarias = draft.areas_usuarias;
+    if (draft.denominacion_cmn !== (proceso.denominacion_cmn ?? ""))
+      payload.denominacion_cmn = draft.denominacion_cmn || null;
+    if (draft.clasificador_cmn !== (proceso.clasificador_cmn ?? ""))
+      payload.clasificador_cmn = draft.clasificador_cmn || null;
+
+    // Nada cambió → cerrar
+    if (Object.keys(payload).length === 0) {
+      setEditMode(false);
+      return;
+    }
+
     actualizarProceso(
-      { id: proceso.id, payload: { requerimiento: editReq } },
-      { onSuccess: () => setEditMode(false) }
+      { id: proceso.id, payload },
+      {
+        onSuccess: () => {
+          setEditMode(false);
+          setDraft(emptyDraft);
+        },
+        onError: (err) => {
+          const axiosErr = err as { response?: { data?: { detail?: string } } };
+          setSaveError(
+            axiosErr?.response?.data?.detail ?? (err instanceof Error ? err.message : "Error al guardar.")
+          );
+        },
+      }
     );
   }
 
@@ -190,32 +300,73 @@ export default function DetalleProceso() {
 
       {/* Title row */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-xl font-bold text-primary font-mono">
             {proceso.id_proceso}
           </h1>
           <EstadoBadge estado={proceso.estado} />
+          <span className="text-xs text-gray-400 font-medium">
+            Mapa (overview) + Foco (registro)
+          </span>
         </div>
         <div className="flex items-center gap-2">
           {/* C5 — PDF export: available to all authenticated roles */}
           <button
             onClick={() => void downloadPdf(proceso.id, proceso.id_proceso)}
             disabled={isExportingPdf}
-            className="border border-outline text-primary font-semibold px-4 py-1.5 rounded text-sm
-                       hover:bg-surface-content transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="border border-outline text-primary font-semibold px-3.5 py-1.5 rounded text-sm
+                       hover:bg-surface-content transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                       inline-flex items-center gap-1.5"
             aria-label={`Exportar proceso ${proceso.id_proceso} a PDF`}
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
             {isExportingPdf ? "Exportando..." : "Exportar PDF"}
           </button>
           {puedeEscribir && !editMode && (
             <button
               onClick={handleEdit}
-              className="px-4 py-1.5 bg-white border border-outline rounded text-sm text-gray-700
-                         hover:bg-surface-content transition-colors"
+              className="px-3.5 py-1.5 bg-white border border-outline rounded text-sm text-gray-700
+                         hover:bg-surface-content transition-colors inline-flex items-center gap-1.5"
               aria-label="Editar proceso"
+              data-testid="btn-editar-proceso"
             >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
               Editar
             </button>
+          )}
+          {puedeEscribir && editMode && (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={isUpdating}
+                className="px-3.5 py-1.5 bg-primary text-white border border-primary rounded text-sm font-semibold
+                           hover:bg-primary-container transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                aria-label="Guardar cambios"
+                data-testid="btn-guardar-proceso"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {isUpdating ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={isUpdating}
+                className="px-3.5 py-1.5 bg-white border border-outline rounded text-sm text-gray-700
+                           hover:bg-surface-content transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                aria-label="Cancelar edición"
+                data-testid="btn-cancelar-edicion"
+              >
+                Cancelar
+              </button>
+            </>
           )}
           {puedeEscribir && !editMode && (
             <button
@@ -223,16 +374,36 @@ export default function DetalleProceso() {
                 setDeleteError(null);
                 setShowDeleteModal(true);
               }}
-              className="px-4 py-1.5 bg-white border border-red-300 rounded text-sm text-red-600
-                         hover:bg-red-50 transition-colors"
+              className="px-3.5 py-1.5 bg-white border border-red-300 rounded text-sm text-red-600
+                         hover:bg-red-50 transition-colors inline-flex items-center gap-1.5"
               aria-label="Eliminar proceso"
               data-testid="btn-eliminar-proceso"
             >
-              Eliminar proceso
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+              </svg>
+              Eliminar
             </button>
           )}
         </div>
       </div>
+
+      {/* Banner editando + error global */}
+      {editMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md px-4 py-2 flex items-center justify-between gap-3">
+          <p className="text-xs text-blue-800 font-medium">
+            ✎ Modo edición — modificá los campos en azul y presioná <strong>Guardar</strong> arriba.
+          </p>
+          {saveError && (
+            <p className="text-xs text-red-600 font-medium" role="alert">
+              {saveError}
+            </p>
+          )}
+        </div>
+      )}
       {/* C5 — PDF export error feedback */}
       {pdfExportError && (
         <p className="text-sm text-red-600" role="alert">
@@ -240,180 +411,258 @@ export default function DetalleProceso() {
         </p>
       )}
 
-      {/* Main 2-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Left: Ficha */}
-        <div className="bg-white border border-outline shadow-card rounded-lg p-6">
-          <h2 className="text-sm font-bold text-primary mb-4 border-b border-outline pb-2">
-            Ficha del Proceso
-          </h2>
+      {/* Ficha del Proceso — horizontal full-width, 4 cols */}
+      <div className="bg-white border border-outline shadow-card rounded-lg p-6">
+        <h2 className="text-sm font-bold text-primary mb-4">
+          Ficha del Proceso
+        </h2>
 
-          <dl className="space-y-4">
-            {/* Requerimiento — editable */}
-            <FichaRow label="Requerimiento">
-              {editMode ? (
-                <div className="space-y-2">
-                  <textarea
-                    rows={3}
-                    value={editReq}
-                    onChange={(e) => setEditReq(e.target.value)}
-                    className="w-full border border-outline rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                    aria-label="Editar requerimiento"
-                  />
-                  <div className="flex gap-2">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
+          {/* ---- Fila 1: Requerimiento | Tipo | Área iniciadora | Año ---- */}
+          <FichaField label="Requerimiento">
+            {editMode ? (
+              <textarea
+                rows={2}
+                value={draft.requerimiento}
+                onChange={(e) => setDraft({ ...draft, requerimiento: e.target.value })}
+                className={EDIT_INPUT_CLS + " resize-none"}
+                aria-label="Editar requerimiento"
+                data-testid="edit-requerimiento"
+              />
+            ) : (
+              <span>{proceso.requerimiento}</span>
+            )}
+          </FichaField>
+
+          <FichaField label="Tipo">
+            {editMode ? (
+              <select
+                value={draft.tipo}
+                onChange={(e) => setDraft({ ...draft, tipo: e.target.value as TipoProceso | "" })}
+                className={EDIT_INPUT_CLS}
+                aria-label="Editar tipo"
+                data-testid="edit-tipo"
+              >
+                <option value="">—</option>
+                <option value="BIEN">BIEN</option>
+                <option value="SERVICIO">SERVICIO</option>
+              </select>
+            ) : proceso.tipo ? (
+              <span className="inline-block text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                {proceso.tipo}
+              </span>
+            ) : (
+              "—"
+            )}
+          </FichaField>
+
+          <FichaField label="Área iniciadora">
+            {editMode ? (
+              <select
+                value={draft.area_iniciadora}
+                onChange={(e) => setDraft({ ...draft, area_iniciadora: e.target.value })}
+                className={EDIT_INPUT_CLS}
+                aria-label="Editar área iniciadora"
+                data-testid="edit-area-iniciadora"
+              >
+                <option value="">—</option>
+                {DEPENDENCIAS.map((d) => (
+                  <option key={d.abrev} value={d.abrev}>
+                    {d.abrev}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              proceso.area_iniciadora ?? "—"
+            )}
+          </FichaField>
+
+          <FichaField label="Año">
+            {editMode ? (
+              <input
+                type="number"
+                min={2020}
+                max={2100}
+                value={draft.anno}
+                onChange={(e) => setDraft({ ...draft, anno: e.target.value })}
+                className={EDIT_INPUT_CLS}
+                aria-label="Editar año"
+                data-testid="edit-anno"
+              />
+            ) : (
+              proceso.anno ?? "—"
+            )}
+          </FichaField>
+
+          {/* ---- Fila 2: PIM | Valor EM | N° OCS | Fecha de creación ---- */}
+          <FichaField label="Presupuesto Institucional (PIM)">
+            {editMode ? (
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={draft.pim}
+                onChange={(e) => setDraft({ ...draft, pim: e.target.value })}
+                placeholder="S/ 0.00"
+                className={EDIT_INPUT_CLS}
+                aria-label="Editar PIM"
+                data-testid="edit-pim"
+              />
+            ) : proceso.pim ? (
+              `S/ ${parseFloat(proceso.pim).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`
+            ) : (
+              "—"
+            )}
+          </FichaField>
+
+          <FichaField label="Valor EM">
+            {montos?.valor_em != null
+              ? `S/ ${montos.valor_em.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—"}
+          </FichaField>
+
+          <FichaField label="N° OCS">
+            {montos?.nro_ocs ?? "—"}
+          </FichaField>
+
+          <FichaField label="Fecha de creación">
+            {new Date(proceso.fecha_creacion).toLocaleDateString("es-PE", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </FichaField>
+
+          {/* ---- Fila 3: Creado por | Dependencias | Denominación CMN | Clasificador ---- */}
+          <FichaField label="Creado por">{proceso.creado_por ?? "—"}</FichaField>
+
+          <FichaField label="Dependencias involucradas">
+            {editMode ? (
+              <div
+                className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1.5 bg-blue-50/40 border border-blue-300 rounded"
+                data-testid="edit-dependencias"
+              >
+                {DEPENDENCIAS.map((d) => {
+                  const selected = draft.areas_usuarias.includes(d.abrev);
+                  const color =
+                    COLORES_ACTOR[d.abrev as keyof typeof COLORES_ACTOR] ??
+                    COLORES_ACTOR.OTIN;
+                  return (
                     <button
-                      onClick={handleSave}
-                      disabled={isUpdating}
-                      className="px-3 py-1 bg-primary text-white text-xs rounded hover:bg-primary-container disabled:opacity-50"
+                      key={d.abrev}
+                      type="button"
+                      onClick={() => toggleAreaUsuaria(d.abrev)}
+                      className={`text-xs px-2 py-0.5 rounded border font-medium transition ${
+                        selected ? "" : "opacity-40 hover:opacity-80"
+                      }`}
+                      style={{
+                        backgroundColor: selected ? color.bg : "#fff",
+                        color: color.text,
+                        borderColor: color.border,
+                      }}
+                      title={d.nombre}
+                      aria-pressed={selected}
                     >
-                      {isUpdating ? "Guardando..." : "Guardar"}
+                      {d.abrev}
                     </button>
-                    <button
-                      onClick={() => setEditMode(false)}
-                      className="px-3 py-1 border border-outline text-xs rounded hover:bg-surface-content"
+                  );
+                })}
+              </div>
+            ) : proceso.areas_usuarias && proceso.areas_usuarias.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {proceso.areas_usuarias.map((area) => {
+                  const color =
+                    COLORES_ACTOR[area as keyof typeof COLORES_ACTOR] ??
+                    COLORES_ACTOR.OTIN;
+                  return (
+                    <span
+                      key={area}
+                      className="text-xs px-2 py-0.5 rounded border font-medium"
+                      style={{
+                        backgroundColor: color.bg,
+                        color: color.text,
+                        borderColor: color.border,
+                      }}
                     >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <span>{proceso.requerimiento}</span>
-              )}
-            </FichaRow>
-
-            <FichaRow label="Tipo">
-              {proceso.tipo ? (
-                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                  {proceso.tipo}
-                </span>
-              ) : (
-                "—"
-              )}
-            </FichaRow>
-
-            <FichaRow label="Área iniciadora">
-              {proceso.area_iniciadora ?? "—"}
-            </FichaRow>
-
-            <FichaRow label="Año">{proceso.anno ?? "—"}</FichaRow>
-
-            <FichaRow label="Presupuesto Institucional (PIM)">
-              {proceso.pim
-                ? `S/ ${parseFloat(proceso.pim).toLocaleString("es-PE", {
-                    minimumFractionDigits: 2,
-                  })}`
-                : "—"}
-            </FichaRow>
-
-            {/* C3b WU-F4 — Valor EM (from E09 COMPLETADO via montos_proceso) */}
-            <FichaRow label="Valor EM">
-              {montos?.valor_em != null
-                ? `S/ ${montos.valor_em.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : '—'}
-            </FichaRow>
-
-            {/* C3b WU-F4 — N° OCS + Monto OCS (from E19 COMPLETADO) */}
-            <FichaRow label="N° OCS">
-              {montos?.nro_ocs ?? '—'}
-            </FichaRow>
-
-            {montos?.monto_ocs != null && (
-              <FichaRow label="Monto OCS">
-                {`S/ ${montos.monto_ocs.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              </FichaRow>
+                      {area}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              "—"
             )}
+          </FichaField>
 
-            {montos?.plazo_entrega != null && (
-              <FichaRow label="Plazo Entrega">
-                {`${montos.plazo_entrega} días`}
-              </FichaRow>
+          <FichaField label="Denominación CMN">
+            {editMode ? (
+              <input
+                type="text"
+                value={draft.denominacion_cmn}
+                onChange={(e) => setDraft({ ...draft, denominacion_cmn: e.target.value })}
+                placeholder="—"
+                className={EDIT_INPUT_CLS}
+                aria-label="Editar denominación CMN"
+                data-testid="edit-denominacion-cmn"
+              />
+            ) : (
+              proceso.denominacion_cmn ?? "—"
             )}
+          </FichaField>
 
-            {montos?.fecha_inicio_srv && (
-              <FichaRow label="Inicio del Servicio">
-                {formatFechaLarga(montos.fecha_inicio_srv)}
-              </FichaRow>
+          <FichaField label="Clasificador de gasto">
+            {editMode ? (
+              <input
+                type="text"
+                value={draft.clasificador_cmn}
+                onChange={(e) => setDraft({ ...draft, clasificador_cmn: e.target.value })}
+                placeholder="—"
+                className={EDIT_INPUT_CLS}
+                aria-label="Editar clasificador de gasto"
+                data-testid="edit-clasificador-cmn"
+              />
+            ) : (
+              proceso.clasificador_cmn ?? "—"
             )}
+          </FichaField>
 
-            <FichaRow label="Tiempo Transcurrido">
-              {dias === 0
-                ? "Hoy"
-                : `${dias} día${dias !== 1 ? "s" : ""}`}
-            </FichaRow>
+          {/* ---- Extras condicionales (cuando hay datos OCS / servicio / cancelación) ---- */}
+          {montos?.monto_ocs != null && (
+            <FichaField label="Monto OCS">
+              {`S/ ${montos.monto_ocs.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </FichaField>
+          )}
 
-            <FichaRow label="Fecha de Creación">
-              {new Date(proceso.fecha_creacion).toLocaleDateString("es-PE", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </FichaRow>
+          {montos?.plazo_entrega != null && (
+            <FichaField label="Plazo Entrega">
+              {`${montos.plazo_entrega} días`}
+            </FichaField>
+          )}
 
-            <FichaRow label="Creado por">{proceso.creado_por ?? "—"}</FichaRow>
+          {montos?.fecha_inicio_srv && (
+            <FichaField label="Inicio del Servicio">
+              {formatFechaLarga(montos.fecha_inicio_srv)}
+            </FichaField>
+          )}
 
-            {/* Áreas usuarias */}
-            {proceso.areas_usuarias && proceso.areas_usuarias.length > 0 && (
-              <FichaRow label="Dependencias Involucradas">
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {proceso.areas_usuarias.map((area) => {
-                    const color =
-                      COLORES_ACTOR[area as keyof typeof COLORES_ACTOR] ??
-                      COLORES_ACTOR.OTIN;
-                    return (
-                      <span
-                        key={area}
-                        className="text-xs px-2 py-0.5 rounded border font-medium"
-                        style={{
-                          backgroundColor: color.bg,
-                          color: color.text,
-                          borderColor: color.border,
-                        }}
-                      >
-                        {area}
-                      </span>
-                    );
-                  })}
-                </div>
-              </FichaRow>
-            )}
+          <FichaField label="Tiempo Transcurrido">
+            {dias === 0 ? "Hoy" : `${dias} día${dias !== 1 ? "s" : ""}`}
+          </FichaField>
 
-            {/* CMN del proceso — flujo-real-otin-v2 */}
-            {(proceso.denominacion_cmn || proceso.clasificador_cmn) && (
-              <>
-                {proceso.denominacion_cmn && (
-                  <FichaRow label="Denominación CMN">
-                    {proceso.denominacion_cmn}
-                  </FichaRow>
-                )}
-                {proceso.clasificador_cmn && (
-                  <FichaRow label="Clasificador de gasto">
-                    {proceso.clasificador_cmn}
-                  </FichaRow>
-                )}
-              </>
-            )}
-
-            {/* Motivo cancelación */}
-            {proceso.estado === "CANCELADO" && proceso.motivo_cancel && (
-              <FichaRow label="Motivo Cancelación">
-                <span className="text-red-700">{proceso.motivo_cancel}</span>
-              </FichaRow>
-            )}
-
-            {/* Documentos placeholder */}
-            <FichaRow label="Documentos de Referencia">
-              <span className="text-gray-400 text-xs">— Disponible próximamente</span>
-            </FichaRow>
-          </dl>
-        </div>
-
-        {/* Right: Timeline — C3a/C3b */}
-        <LineaTiempo
-          procesoId={proceso.id}
-          areasUsuarias={proceso.areas_usuarias ?? []}
-          procesoEstado={proceso.estado}
-        />
+          {proceso.estado === "CANCELADO" && proceso.motivo_cancel && (
+            <FichaField label="Motivo Cancelación" className="lg:col-span-2">
+              <span className="text-red-700">{proceso.motivo_cancel}</span>
+            </FichaField>
+          )}
+        </dl>
       </div>
+
+      {/* Mapa / Foco — full width abajo */}
+      <LineaTiempo
+        procesoId={proceso.id}
+        areasUsuarias={proceso.areas_usuarias ?? []}
+        procesoEstado={proceso.estado}
+      />
 
       {/* Modal de confirmación de eliminación */}
       {showDeleteModal && (

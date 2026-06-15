@@ -95,15 +95,24 @@ export function LineaTiempo({ procesoId, areasUsuarias = [], procesoEstado }: Li
   }
 
   const titulo = modo === "mapa" ? "Mapa del Proceso" : "Registro de Etapas";
+  const subtitulo =
+    modo === "mapa"
+      ? `${etapas.filter((e) => !e.es_bucle).length} etapas · 5 fases${
+          progreso.etapa_actual ? ` · etapa actual ${progreso.etapa_actual}` : ""
+        }`
+      : "Selecciona una etapa para registrar o editar su avance";
 
   return (
     <div
-      className="bg-white border border-outline shadow-card rounded-lg p-6 h-full flex flex-col gap-4"
+      className="bg-white border border-outline shadow-card rounded-lg p-6 h-full flex flex-col gap-3"
       aria-label="Panel de etapas del proceso"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-base font-bold text-primary">{titulo}</h2>
+      {/* Header — fila 1: titulo + toggle */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex flex-col">
+          <h2 className="text-base font-bold text-primary">{titulo}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{subtitulo}</p>
+        </div>
         <div className="flex items-center gap-3">
           {/* Toggle Mapa / Foco */}
           <div
@@ -117,11 +126,16 @@ export function LineaTiempo({ procesoId, areasUsuarias = [], procesoEstado }: Li
               aria-selected={modo === "mapa"}
               onClick={() => {
                 setModo("mapa");
-                // Mantener etapaSeleccionada para si vuelven a Foco
               }}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-md transition capitalize
+              className={`text-xs font-semibold px-3 py-1.5 rounded-md transition inline-flex items-center gap-1.5
                 ${modo === "mapa" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
             >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
               Mapa
             </button>
             <button
@@ -129,29 +143,35 @@ export function LineaTiempo({ procesoId, areasUsuarias = [], procesoEstado }: Li
               role="tab"
               aria-selected={modo === "foco"}
               onClick={handleSwitchToFoco}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-md transition capitalize
+              className={`text-xs font-semibold px-3 py-1.5 rounded-md transition inline-flex items-center gap-1.5
                 ${modo === "foco" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
             >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
               Foco
             </button>
-          </div>
-          {/* Progreso */}
-          <div className="text-xs text-gray-600">
-            <span className="font-semibold">{progreso.completadas}</span>/{progreso.total} etapas
-            <span className="ml-2 font-semibold text-primary">{Math.round(progreso.porcentaje)}%</span>
           </div>
         </div>
       </div>
 
-      {/* Barra de progreso */}
-      <div
-        className="w-full bg-gray-100 rounded-full h-1.5"
-        aria-label={`Progreso: ${Math.round(progreso.porcentaje)}%`}
-      >
+      {/* Header — fila 2: progreso a la derecha con barra mini */}
+      <div className="flex items-center justify-end gap-2.5">
+        <span className="text-xs font-semibold text-gray-700">
+          {progreso.completadas}/{progreso.total}
+          <span className="text-gray-300 mx-1.5">·</span>
+          <span className="text-primary">{Math.round(progreso.porcentaje)}%</span>
+        </span>
         <div
-          className="h-1.5 rounded-full transition-all duration-300"
-          style={{ width: `${progreso.porcentaje}%`, backgroundColor: "#16A34A" }}
-        />
+          className="w-40 bg-gray-100 rounded-full h-1.5"
+          aria-label={`Progreso: ${Math.round(progreso.porcentaje)}%`}
+        >
+          <div
+            className="h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${progreso.porcentaje}%`, backgroundColor: "#16A34A" }}
+          />
+        </div>
       </div>
 
       {/* ====== Vista MAPA ====== */}
